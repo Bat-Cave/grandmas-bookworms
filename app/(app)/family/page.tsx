@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FamilyMemberAddForm } from "@/forms/family-member-add-form";
 import { FamilyMemberEditForm } from "@/forms/family-member-edit-form";
+import { toUserErrorMessage } from "@/lib/error-messages";
 import { getParticipantAgeGroup, getParticipantDisplayName } from "@/lib/participants";
 import { EmojiSequenceInput } from "@/components/family/emoji-sequence-input";
 import { Input } from "@/components/ui/input";
@@ -152,7 +153,7 @@ export default function FamilyPage() {
                 setPasscode("");
                 setPasscodeConfirm("");
               } catch (err) {
-                setPasscodeError(err instanceof Error ? err.message : "Failed to save");
+                setPasscodeError(toUserErrorMessage(err, "Failed to save"));
               } finally {
                 setSavingPasscode(false);
               }
@@ -326,7 +327,7 @@ export default function FamilyPage() {
                       });
                       setUnlockingParticipant(null);
                     } catch (err) {
-                      setUnlockError(err instanceof Error ? err.message : "Failed to save");
+                      setUnlockError(toUserErrorMessage(err, "Failed to save"));
                     } finally {
                       setSavingUnlock(false);
                     }

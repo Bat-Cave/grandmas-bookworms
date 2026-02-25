@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 import type { Id } from './_generated/dataModel'
 import { query } from './_generated/server'
+import { getAccountForOwnerId } from './lib/authz'
 
 const formatParticipantName = (p?: {
   firstName?: string
@@ -28,10 +29,18 @@ export const getRaffleTicketsForParticipant = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity()
     if (!identity) return null
+    const myAccount = await getAccountForOwnerId(ctx, identity.subject)
+    if (!myAccount?.organizationId) return null
     const participant = await ctx.db.get(args.participantId)
     if (!participant) return null
     const account = await ctx.db.get(participant.accountId)
-    if (!account || account.ownerId !== identity.subject) return null
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return null
+    }
     return await ctx.db
       .query('raffleTickets')
       .withIndex('by_participant_and_period', (q) =>
@@ -53,11 +62,8 @@ export const getRaffleTicketsForMyParticipants = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity()
     if (!identity) return []
-    const account = await ctx.db
-      .query('accounts')
-      .withIndex('by_owner', (q) => q.eq('ownerId', identity.subject))
-      .unique()
-    if (!account) return []
+    const account = await getAccountForOwnerId(ctx, identity.subject)
+    if (!account?.organizationId) return []
     const participants = await ctx.db
       .query('participants')
       .withIndex('by_account', (q) => q.eq('accountId', account._id))
@@ -96,10 +102,18 @@ export const getBadgesForParticipant = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity()
     if (!identity) return []
+    const myAccount = await getAccountForOwnerId(ctx, identity.subject)
+    if (!myAccount?.organizationId) return []
     const participant = await ctx.db.get(args.participantId)
     if (!participant) return []
     const account = await ctx.db.get(participant.accountId)
-    if (!account || account.ownerId !== identity.subject) return []
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return []
+    }
     const links = await ctx.db
       .query('participantBadges')
       .withIndex('by_participant', (q) =>
@@ -127,10 +141,18 @@ export const getParticipantBadgeCounts = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity()
     if (!identity) return null
+    const myAccount = await getAccountForOwnerId(ctx, identity.subject)
+    if (!myAccount?.organizationId) return null
     const participant = await ctx.db.get(args.participantId)
     if (!participant) return null
     const account = await ctx.db.get(participant.accountId)
-    if (!account || account.ownerId !== identity.subject) return null
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return null
+    }
 
     const completions = await ctx.db
       .query('activityCompletions')
@@ -189,10 +211,18 @@ export const getBingoLinesForParticipant = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity()
     if (!identity) return []
+    const myAccount = await getAccountForOwnerId(ctx, identity.subject)
+    if (!myAccount?.organizationId) return []
     const participant = await ctx.db.get(args.participantId)
     if (!participant) return []
     const account = await ctx.db.get(participant.accountId)
-    if (!account || account.ownerId !== identity.subject) return []
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return []
+    }
     const lines = await ctx.db
       .query('bingoLines')
       .withIndex('by_participant', (q) =>
@@ -206,4 +236,3 @@ export const getBingoLinesForParticipant = query({
     }))
   },
 })
-

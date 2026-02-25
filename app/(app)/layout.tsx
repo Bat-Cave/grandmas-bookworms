@@ -24,15 +24,21 @@ import { getParticipantDisplayName } from '@/lib/participants'
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { isSignedIn } = useAuth()
+  const membership = useQuery(api.organizations.getMyMembership, {})
   const account = useQuery(api.accounts.getMyAccount, {})
 
   useEffect(() => {
-    if (isSignedIn && account === null) {
+    if (!isSignedIn || membership === undefined || account === undefined) return
+    if (membership === null) {
+      router.replace('/join')
+      return
+    }
+    if (account === null) {
       router.replace('/onboarding')
     }
-  }, [isSignedIn, account, router])
+  }, [isSignedIn, membership, account, router])
 
-  if (account === undefined) {
+  if (membership === undefined || account === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-muted-foreground">Loading...</p>
@@ -75,10 +81,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </SignedOut>
       <SignedIn>
-        {account === null ? null : (
+        {membership === null || account === null ? null : (
           <FamilySessionProvider>
             <FamilyGate>
-              <AppFrame accountType={account.type}>{children}</AppFrame>
+              <AppFrame
+                isOrgAdmin={membership.role === 'admin'}
+                accountType={account.type}
+              >
+                {children}
+              </AppFrame>
             </FamilyGate>
           </FamilySessionProvider>
         )}
@@ -88,9 +99,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 }
 
 function AppFrame({
+  isOrgAdmin,
   accountType,
   children,
 }: {
+  isOrgAdmin: boolean
   accountType: 'individual' | 'family'
   children: React.ReactNode
 }) {
@@ -102,6 +115,7 @@ function AppFrame({
 
   const isFamily = accountType === 'family'
   const isParent = activeParticipant?.role === 'owner' && isFamily
+  const canAccessOrganization = isOrgAdmin && (!isFamily || isParent)
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -119,6 +133,11 @@ function AppFrame({
           <Link href="/rewards" className="font-medium hover:underline">
             Rewards
           </Link>
+          {canAccessOrganization && (
+            <Link href="/organization" className="font-medium hover:underline">
+              Organization
+            </Link>
+          )}
           {isParent && (
             <Link href="/family" className="font-medium hover:underline">
               Family
@@ -138,22 +157,21 @@ function AppFrame({
                 </Button>
               </div>
             )}
-            {!isFamily ||
-              (isParent && (
-                <>
-                  <SignedOut>
-                    <SignInButton />
-                    <SignUpButton>
-                      <button className="bg-[#6c47ff] text-white rounded-full font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 cursor-pointer">
-                        Sign Up
-                      </button>
-                    </SignUpButton>
-                  </SignedOut>
-                  <SignedIn>
-                    <UserButton />
-                  </SignedIn>
-                </>
-              ))}
+            {(!isFamily || isParent) && (
+              <>
+                <SignedOut>
+                  <SignInButton />
+                  <SignUpButton>
+                    <button className="bg-[#6c47ff] text-white rounded-full font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 cursor-pointer">
+                      Sign Up
+                    </button>
+                  </SignUpButton>
+                </SignedOut>
+                <SignedIn>
+                  <UserButton />
+                </SignedIn>
+              </>
+            )}
           </div>
         </div>
       </nav>

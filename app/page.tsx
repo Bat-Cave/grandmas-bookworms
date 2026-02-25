@@ -16,16 +16,21 @@ import { Button } from '@/components/ui/button'
 export default function Home() {
   const router = useRouter()
   const { isSignedIn } = useAuth()
+  const membership = useQuery(api.organizations.getMyMembership, {})
   const account = useQuery(api.accounts.getMyAccount, {})
 
   useEffect(() => {
-    if (!isSignedIn || account === undefined) return
+    if (!isSignedIn || membership === undefined || account === undefined) return
+    if (membership === null) {
+      router.replace('/join')
+      return
+    }
     if (account === null) {
       router.replace('/onboarding')
       return
     }
     router.replace('/dashboard')
-  }, [isSignedIn, account, router])
+  }, [isSignedIn, membership, account, router])
 
   return (
     <>

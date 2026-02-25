@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
 import { getAgeGroupFromBirthday } from "./ageGroup";
+import { requireMyAccountWithOrganization } from "./lib/authz";
 
 const FREE_POSITION = 12; // center of 5x5 (row 2, col 2)
 const PERIOD_KEY = "current"; // could be "2025-02" or "summer-2025" later
@@ -19,13 +19,17 @@ export const getOrCreateForParticipant = mutation({
   args: { participantId: v.id("participants") },
   returns: v.id("bingoCards"),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const myAccount = await requireMyAccountWithOrganization(ctx);
     const participant = await ctx.db.get(args.participantId);
-    if (!participant) throw new Error("Participant not found");
+    if (!participant) throw new Error("PARTICIPANT_NOT_FOUND");
     const account = await ctx.db.get(participant.accountId);
-    if (!account || account.ownerId !== identity.subject)
-      throw new Error("Forbidden");
+    if (
+      !account ||
+      account.ownerId !== myAccount.ownerId ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      throw new Error("FORBIDDEN");
+    }
 
     const existing = await ctx.db
       .query("bingoCards")
@@ -43,7 +47,7 @@ export const getOrCreateForParticipant = mutation({
       return groups.includes(participantAgeGroup);
     });
     if (eligible.length < 24)
-      throw new Error("Not enough activities for this age group");
+      throw new Error("INSUFFICIENT_ACTIVITIES_FOR_AGE_GROUP");
 
     const picked = shuffle(eligible).slice(0, 24);
     const cardId = await ctx.db.insert("bingoCards", {
@@ -79,10 +83,21 @@ export const getCardForParticipant = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
+    const myAccount = await ctx.db
+      .query("accounts")
+      .withIndex("by_owner", (q) => q.eq("ownerId", identity.subject))
+      .unique();
+    if (!myAccount?.organizationId) return null;
     const participant = await ctx.db.get(args.participantId);
     if (!participant) return null;
     const account = await ctx.db.get(participant.accountId);
-    if (!account || account.ownerId !== identity.subject) return null;
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return null;
+    }
     return await ctx.db
       .query("bingoCards")
       .withIndex("by_participant_and_period", (q) =>
@@ -116,12 +131,23 @@ export const getCardWithSquares = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
+    const myAccount = await ctx.db
+      .query("accounts")
+      .withIndex("by_owner", (q) => q.eq("ownerId", identity.subject))
+      .unique();
+    if (!myAccount?.organizationId) return null;
     const card = await ctx.db.get(args.bingoCardId);
     if (!card) return null;
     const participant = await ctx.db.get(card.participantId);
     if (!participant) return null;
     const account = await ctx.db.get(participant.accountId);
-    if (!account || account.ownerId !== identity.subject) return null;
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return null;
+    }
 
     const squares = await ctx.db
       .query("bingoSquares")

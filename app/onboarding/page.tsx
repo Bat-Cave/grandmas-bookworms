@@ -9,11 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OnboardingAccountForm } from "@/forms/onboarding-account-form";
 import { OnboardingOwnerForm } from "@/forms/onboarding-owner-form";
 import { OnboardingKidsForm } from "@/forms/onboarding-kids-form";
+import { toUserErrorMessage } from "@/lib/error-messages";
 
 type AccountType = "individual" | "family";
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const membership = useQuery(api.organizations.getMyMembership, {});
   const account = useQuery(api.accounts.getMyAccount, {});
   const createAccount = useMutation(api.accounts.createAccount);
   const createOwnerParticipant = useMutation(
@@ -33,19 +35,23 @@ export default function OnboardingPage() {
   const [createdAccountId, setCreatedAccountId] = useState<Id<"accounts"> | null>(null);
 
   useEffect(() => {
+    if (membership === null) {
+      router.replace("/join");
+      return;
+    }
     if (account !== undefined && account !== null) {
       router.replace("/dashboard");
     }
-  }, [account, router]);
+  }, [membership, account, router]);
 
-  if (account === undefined) {
+  if (membership === undefined || account === undefined) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
-  if (account !== null) {
+  if (membership === null || account !== null) {
     return null;
   }
 
@@ -90,7 +96,7 @@ export default function OnboardingPage() {
         router.push("/dashboard");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      setError(toUserErrorMessage(err, "Failed to save"));
     } finally {
       setLoading(false);
     }
@@ -125,7 +131,7 @@ export default function OnboardingPage() {
       }
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add members");
+      setError(toUserErrorMessage(err, "Failed to add members"));
     } finally {
       setLoading(false);
     }

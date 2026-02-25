@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
 import { evaluateBadges } from "./badges/evaluate";
+import { requireMyAccountWithOrganization } from "./lib/authz";
 
 const PERIOD_KEY = "current";
 
@@ -17,19 +17,30 @@ export const startActivity = mutation({
   },
   returns: v.id("activityCompletions"),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const myAccount = await requireMyAccountWithOrganization(ctx);
     const participant = await ctx.db.get(args.participantId);
-    if (!participant) throw new Error("Participant not found");
+    if (!participant) throw new Error("PARTICIPANT_NOT_FOUND");
     const account = await ctx.db.get(participant.accountId);
-    if (!account || account.ownerId !== identity.subject)
-      throw new Error("Forbidden");
+    if (
+      !account ||
+      account.ownerId !== myAccount.ownerId ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      throw new Error("FORBIDDEN");
+    }
+
+    const square = await ctx.db.get(args.bingoSquareId);
+    if (!square) throw new Error("SQUARE_NOT_FOUND");
+    const card = await ctx.db.get(square.bingoCardId);
+    if (!card || card.participantId !== args.participantId) {
+      throw new Error("FORBIDDEN");
+    }
 
     const existing = await ctx.db
       .query("activityCompletions")
       .withIndex("by_square", (q) => q.eq("bingoSquareId", args.bingoSquareId))
       .first();
-    if (existing) throw new Error("Activity already started for this square");
+    if (existing) throw new Error("ACTIVITY_ALREADY_STARTED");
 
     return await ctx.db.insert("activityCompletions", {
       bingoSquareId: args.bingoSquareId,
@@ -47,26 +58,32 @@ export const completeActivity = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const myAccount = await requireMyAccountWithOrganization(ctx);
     const completion = await ctx.db.get(args.completionId);
-    if (!completion) throw new Error("Completion not found");
+    if (!completion) throw new Error("COMPLETION_NOT_FOUND");
     const participant = await ctx.db.get(completion.participantId);
-    if (!participant) throw new Error("Participant not found");
+    if (!participant) throw new Error("PARTICIPANT_NOT_FOUND");
     const account = await ctx.db.get(participant.accountId);
-    if (!account || account.ownerId !== identity.subject)
-      throw new Error("Forbidden");
-    if (completion.completedAt) throw new Error("Already completed");
+    if (
+      !account ||
+      account.ownerId !== myAccount.ownerId ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      throw new Error("FORBIDDEN");
+    }
+    if (completion.completedAt) throw new Error("ALREADY_COMPLETED");
+
+    const square = await ctx.db.get(completion.bingoSquareId);
+    if (!square) return null;
+    const card = await ctx.db.get(square.bingoCardId);
+    if (!card) return null;
+    if (card.participantId !== participant._id) throw new Error("FORBIDDEN");
 
     await ctx.db.patch(args.completionId, {
       completedAt: args.completedAt,
       formData: args.formData,
     });
 
-    const square = await ctx.db.get(completion.bingoSquareId);
-    if (!square) return null;
-    const card = await ctx.db.get(square.bingoCardId);
-    if (!card) return null;
     let raffleValue = 0;
     if (square.baseActivityId) {
       const activity = await ctx.db.get(square.baseActivityId);
@@ -199,6 +216,25 @@ export const getCompletionForSquare = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
+    const myAccount = await ctx.db
+      .query("accounts")
+      .withIndex("by_owner", (q) => q.eq("ownerId", identity.subject))
+      .unique();
+    if (!myAccount?.organizationId) return null;
+    const square = await ctx.db.get(args.bingoSquareId);
+    if (!square) return null;
+    const card = await ctx.db.get(square.bingoCardId);
+    if (!card) return null;
+    const participant = await ctx.db.get(card.participantId);
+    if (!participant) return null;
+    const account = await ctx.db.get(participant.accountId);
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return null;
+    }
     return await ctx.db
       .query("activityCompletions")
       .withIndex("by_square", (q) => q.eq("bingoSquareId", args.bingoSquareId))
@@ -219,12 +255,23 @@ export const listCompletionsForCard = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
+    const myAccount = await ctx.db
+      .query("accounts")
+      .withIndex("by_owner", (q) => q.eq("ownerId", identity.subject))
+      .unique();
+    if (!myAccount?.organizationId) return [];
     const card = await ctx.db.get(args.bingoCardId);
     if (!card) return [];
     const participant = await ctx.db.get(card.participantId);
     if (!participant) return [];
     const account = await ctx.db.get(participant.accountId);
-    if (!account || account.ownerId !== identity.subject) return [];
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return [];
+    }
 
     const squares = await ctx.db
       .query("bingoSquares")

@@ -1,5 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import {
+  getAccountForOwnerId,
+  getActiveMembershipByOwnerId,
+  requireMyAccountWithOrganization,
+} from "./lib/authz";
 
 const hashValue = async (value: string) => {
   const data = new TextEncoder().encode(value);
@@ -30,8 +35,16 @@ export const listByAccount = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
+    const myAccount = await getAccountForOwnerId(ctx, identity.subject);
+    if (!myAccount?.organizationId) return [];
     const account = await ctx.db.get(args.accountId);
-    if (!account || account.ownerId !== identity.subject) return [];
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return [];
+    }
     return await ctx.db
       .query("participants")
       .withIndex("by_account", (q) => q.eq("accountId", args.accountId))
@@ -45,10 +58,18 @@ export const getParticipant = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
+    const myAccount = await getAccountForOwnerId(ctx, identity.subject);
+    if (!myAccount?.organizationId) return null;
     const participant = await ctx.db.get(args.participantId);
     if (!participant) return null;
     const account = await ctx.db.get(participant.accountId);
-    if (!account || account.ownerId !== identity.subject) return null;
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return null;
+    }
     return participant;
   },
 });
@@ -64,12 +85,17 @@ export const addMember = mutation({
   },
   returns: v.id("participants"),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const myAccount = await requireMyAccountWithOrganization(ctx);
     const account = await ctx.db.get(args.accountId);
-    if (!account || account.ownerId !== identity.subject)
-      throw new Error("Forbidden");
-    if (account.type !== "family") throw new Error("Only family accounts can add members");
+    if (
+      !account ||
+      account.ownerId !== myAccount.ownerId ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      throw new Error("FORBIDDEN");
+    }
+    if (account.type !== "family")
+      throw new Error("ONLY_FAMILY_CAN_ADD_MEMBERS");
     return await ctx.db.insert("participants", {
       accountId: args.accountId,
       firstName: args.firstName,
@@ -91,18 +117,22 @@ export const createOwnerParticipant = mutation({
   },
   returns: v.id("participants"),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const myAccount = await requireMyAccountWithOrganization(ctx);
     const account = await ctx.db.get(args.accountId);
-    if (!account || account.ownerId !== identity.subject)
-      throw new Error("Forbidden");
+    if (
+      !account ||
+      account.ownerId !== myAccount.ownerId ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      throw new Error("FORBIDDEN");
+    }
     const existing = await ctx.db
       .query("participants")
       .withIndex("by_account_and_role", (q) =>
         q.eq("accountId", args.accountId).eq("role", "owner")
       )
       .first();
-    if (existing) throw new Error("Owner participant already exists");
+    if (existing) throw new Error("OWNER_PARTICIPANT_ALREADY_EXISTS");
     return await ctx.db.insert("participants", {
       accountId: args.accountId,
       firstName: args.firstName,
@@ -122,13 +152,17 @@ export const updateParticipant = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const myAccount = await requireMyAccountWithOrganization(ctx);
     const participant = await ctx.db.get(args.participantId);
-    if (!participant) throw new Error("Participant not found");
+    if (!participant) throw new Error("PARTICIPANT_NOT_FOUND");
     const account = await ctx.db.get(participant.accountId);
-    if (!account || account.ownerId !== identity.subject)
-      throw new Error("Forbidden");
+    if (
+      !account ||
+      account.ownerId !== myAccount.ownerId ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      throw new Error("FORBIDDEN");
+    }
     const updates: {
       firstName?: string;
       lastName?: string;
@@ -152,16 +186,20 @@ export const setParticipantUnlock = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const myAccount = await requireMyAccountWithOrganization(ctx);
     const participant = await ctx.db.get(args.participantId);
-    if (!participant) throw new Error("Participant not found");
+    if (!participant) throw new Error("PARTICIPANT_NOT_FOUND");
     const account = await ctx.db.get(participant.accountId);
-    if (!account || account.ownerId !== identity.subject)
-      throw new Error("Forbidden");
-    if (!account.parentPasscodeHash) throw new Error("Parent passcode not set");
+    if (
+      !account ||
+      account.ownerId !== myAccount.ownerId ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      throw new Error("FORBIDDEN");
+    }
+    if (!account.parentPasscodeHash) throw new Error("PARENT_PASSCODE_NOT_SET");
     if (account.parentPasscodeHash !== (await hashValue(args.parentPasscode)))
-      throw new Error("Incorrect passcode");
+      throw new Error("INCORRECT_PARENT_PASSCODE");
     await ctx.db.patch(args.participantId, {
       unlockType: args.unlockType,
       unlockHash: await hashValue(args.unlockValue),
@@ -179,10 +217,18 @@ export const verifyUnlock = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return false;
+    const myAccount = await getAccountForOwnerId(ctx, identity.subject);
+    if (!myAccount?.organizationId) return false;
     const participant = await ctx.db.get(args.participantId);
     if (!participant) return false;
     const account = await ctx.db.get(participant.accountId);
-    if (!account || account.ownerId !== identity.subject) return false;
+    if (
+      !account ||
+      account.ownerId !== identity.subject ||
+      account.organizationId !== myAccount.organizationId
+    ) {
+      return false;
+    }
     if (!participant.unlockHash) return false;
     return participant.unlockHash === (await hashValue(args.unlockValue));
   },
@@ -194,11 +240,8 @@ export const listMyParticipants = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_owner", (q) => q.eq("ownerId", identity.subject))
-      .unique();
-    if (!account) return [];
+    const account = await getAccountForOwnerId(ctx, identity.subject);
+    if (!account?.organizationId) return [];
     return await ctx.db
       .query("participants")
       .withIndex("by_account", (q) => q.eq("accountId", account._id))
@@ -213,32 +256,46 @@ export const listClubParticipants = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    return await ctx.db.query("participants").collect();
+    const membership = await getActiveMembershipByOwnerId(ctx, identity.subject);
+    if (!membership) return [];
+    const orgMemberships = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org", (q) => q.eq("organizationId", membership.organizationId))
+      .collect();
+    const activeOwnerIds = new Set(
+      orgMemberships.filter((m) => m.status === "active").map((m) => m.ownerId),
+    );
+    const orgAccounts = (await ctx.db.query("accounts").collect()).filter((a) =>
+      activeOwnerIds.has(a.ownerId),
+    );
+    const orgAccountIds = new Set(orgAccounts.map((a) => a._id));
+    const participants = await ctx.db.query("participants").collect();
+    return participants.filter((p) => orgAccountIds.has(p.accountId));
   },
 });
 
-/** Message recipients based on admin rules. */
+/** Message recipients are participants in the same organization. */
 export const listMessageRecipients = query({
   args: {},
   returns: v.array(participantDocValidator),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_owner", (q) => q.eq("ownerId", identity.subject))
-      .unique();
-    if (!account) return [];
-    if (account.isAdmin) {
-      return await ctx.db.query("participants").collect();
-    }
-    const adminAccounts = await ctx.db
-      .query("accounts")
-      .filter((q) => q.eq(q.field("isAdmin"), true))
+    const membership = await getActiveMembershipByOwnerId(ctx, identity.subject);
+    if (!membership) return [];
+    const orgMemberships = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org", (q) => q.eq("organizationId", membership.organizationId))
       .collect();
-    if (adminAccounts.length === 0) return [];
-    const adminAccountIds = new Set(adminAccounts.map((a) => a._id));
+    const activeOwnerIds = new Set(
+      orgMemberships.filter((m) => m.status === "active").map((m) => m.ownerId),
+    );
+    const orgAccounts = (await ctx.db.query("accounts").collect()).filter((a) =>
+      activeOwnerIds.has(a.ownerId),
+    );
+    if (orgAccounts.length === 0) return [];
+    const orgAccountIds = new Set(orgAccounts.map((a) => a._id));
     const allParticipants = await ctx.db.query("participants").collect();
-    return allParticipants.filter((p) => adminAccountIds.has(p.accountId));
+    return allParticipants.filter((p) => orgAccountIds.has(p.accountId));
   },
 });

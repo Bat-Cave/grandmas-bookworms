@@ -1,5 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import {
+  getAccountForOwnerId,
+  requireActiveMembershipByOwnerId,
+  requireIdentity,
+} from "./lib/authz";
 
 const hashValue = async (value: string) => {
   const data = new TextEncoder().encode(value);
@@ -17,6 +22,7 @@ export const getMyAccount = query({
       _id: v.id("accounts"),
       _creationTime: v.number(),
       ownerId: v.string(),
+      organizationId: v.optional(v.id("organizations")),
       type: v.union(v.literal("individual"), v.literal("family")),
       displayName: v.string(),
       isAdmin: v.boolean(),
@@ -26,15 +32,13 @@ export const getMyAccount = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
-    const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_owner", (q) => q.eq("ownerId", identity.subject))
-      .unique();
+    const account = await getAccountForOwnerId(ctx, identity.subject);
     if (!account) return null;
     return {
       _id: account._id,
       _creationTime: account._creationTime,
       ownerId: account.ownerId,
+      organizationId: account.organizationId,
       type: account.type,
       displayName: account.displayName,
       isAdmin: account.isAdmin ?? false,
@@ -51,15 +55,16 @@ export const createAccount = mutation({
   },
   returns: v.id("accounts"),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-    const existing = await ctx.db
-      .query("accounts")
-      .withIndex("by_owner", (q) => q.eq("ownerId", identity.subject))
-      .unique();
-    if (existing) throw new Error("Account already exists");
+    const identity = await requireIdentity(ctx);
+    const { membership } = await requireActiveMembershipByOwnerId(
+      ctx,
+      identity.subject
+    );
+    const existing = await getAccountForOwnerId(ctx, identity.subject);
+    if (existing) throw new Error("ACCOUNT_ALREADY_EXISTS");
     return await ctx.db.insert("accounts", {
       ownerId: identity.subject,
+      organizationId: membership.organizationId,
       type: args.type,
       displayName: args.displayName,
       isAdmin: false,
@@ -77,11 +82,10 @@ export const updateAccount = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const identity = await requireIdentity(ctx);
     const account = await ctx.db.get(args.accountId);
     if (!account || account.ownerId !== identity.subject)
-      throw new Error("Forbidden");
+      throw new Error("FORBIDDEN");
     const updates: { displayName?: string } = {};
     if (args.displayName !== undefined) updates.displayName = args.displayName;
     if (Object.keys(updates).length > 0)
@@ -97,11 +101,10 @@ export const setParentPasscode = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const identity = await requireIdentity(ctx);
     const account = await ctx.db.get(args.accountId);
     if (!account || account.ownerId !== identity.subject)
-      throw new Error("Forbidden");
+      throw new Error("FORBIDDEN");
     await ctx.db.patch(args.accountId, {
       parentPasscodeHash: await hashValue(args.parentPasscode),
     });
@@ -115,10 +118,7 @@ export const verifyParentPasscode = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return false;
-    const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_owner", (q) => q.eq("ownerId", identity.subject))
-      .unique();
+    const account = await getAccountForOwnerId(ctx, identity.subject);
     if (!account || !account.parentPasscodeHash) return false;
     return account.parentPasscodeHash === (await hashValue(args.passcode));
   },

@@ -1,29 +1,40 @@
-"use client";
+'use client'
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import type { Id } from "@/convex/_generated/dataModel";
-import { getParticipantAgeGroup, getParticipantDisplayName } from "@/lib/participants";
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { Button } from '@/components/ui/button'
 import {
-  messageSendSchema,
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/ui/combobox'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import type { Id } from '@/convex/_generated/dataModel'
+import {
+  getParticipantAgeGroup,
+  getParticipantDisplayName,
+} from '@/lib/participants'
+import {
   type MessageSendValues,
-} from "@/validators/message-send";
+  messageSendSchema,
+} from '@/validators/message-send'
 
 type ParticipantOption = {
-  _id: Id<"participants">;
-  firstName?: string | null;
-  lastName?: string | null;
-  birthday?: string | null;
-};
+  _id: Id<'participants'>
+  firstName?: string | null
+  lastName?: string | null
+  birthday?: string | null
+}
 
 type MessageSendFormProps = {
-  participants: ParticipantOption[];
-  loading?: boolean;
-  onSubmit: (values: MessageSendValues) => void | Promise<void>;
-};
+  participants: ParticipantOption[]
+  loading?: boolean
+  onSubmit: (values: MessageSendValues) => void | Promise<void>
+}
 
 export function MessageSendForm({
   participants,
@@ -32,33 +43,50 @@ export function MessageSendForm({
 }: MessageSendFormProps) {
   const form = useForm<MessageSendValues>({
     resolver: zodResolver(messageSendSchema),
-    mode: "onChange",
+    mode: 'onChange',
     defaultValues: {
-      recipientId: "",
-      body: "",
+      recipientId: '',
+      body: '',
     },
-  });
+  })
 
   const handleSubmit = async (values: MessageSendValues) => {
-    await onSubmit(values);
-    form.reset({ recipientId: "", body: "" });
-  };
+    await onSubmit(values)
+    form.reset({ recipientId: '', body: '' })
+  }
 
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
       <div>
         <Label>To</Label>
-        <select
-          className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-          {...form.register("recipientId")}
+        <Combobox
+          items={participants}
+          itemToStringLabel={(p) =>
+            `${getParticipantDisplayName(p)} (${getParticipantAgeGroup(p)})`
+          }
+          itemToStringValue={(p) =>
+            `${getParticipantDisplayName(p)} (${getParticipantAgeGroup(p)})`
+          }
+          value={
+            participants.find((p) => p._id === form.watch('recipientId')) ??
+            null
+          }
+          onValueChange={(p) =>
+            form.setValue('recipientId', p?._id ?? '', { shouldValidate: true })
+          }
         >
-          <option value="">Select a person…</option>
-          {participants.map((p) => (
-            <option key={p._id} value={p._id}>
-              {getParticipantDisplayName(p)} ({getParticipantAgeGroup(p)})
-            </option>
-          ))}
-        </select>
+          <ComboboxInput placeholder="Select a person…" className="mt-1" />
+          <ComboboxContent>
+            <ComboboxEmpty>No one found.</ComboboxEmpty>
+            <ComboboxList>
+              {(p) => (
+                <ComboboxItem key={p._id} value={p}>
+                  {getParticipantDisplayName(p)} ({getParticipantAgeGroup(p)})
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
         {form.formState.errors.recipientId && (
           <p className="text-sm text-destructive mt-1">
             {form.formState.errors.recipientId.message}
@@ -70,7 +98,7 @@ export function MessageSendForm({
         <Textarea
           placeholder="Write something kind..."
           className="mt-1 min-h-[100px]"
-          {...form.register("body")}
+          {...form.register('body')}
         />
         {form.formState.errors.body && (
           <p className="text-sm text-destructive mt-1">
@@ -78,12 +106,9 @@ export function MessageSendForm({
           </p>
         )}
       </div>
-      <Button
-        type="submit"
-        disabled={loading || !form.formState.isValid}
-      >
-        {loading ? "Sending…" : "Send"}
+      <Button type="submit" disabled={loading || !form.formState.isValid}>
+        {loading ? 'Sending…' : 'Send'}
       </Button>
     </form>
-  );
+  )
 }

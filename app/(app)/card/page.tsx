@@ -1,6 +1,7 @@
 'use client'
 
 import { useMutation, useQuery } from 'convex/react'
+import { Check } from 'lucide-react'
 import { useState } from 'react'
 import { useFamilySession } from '@/components/family/family-session'
 import { Button } from '@/components/ui/button'
@@ -15,11 +16,13 @@ import { api } from '@/convex/_generated/api'
 import type { Id } from '@/convex/_generated/dataModel'
 import { CompletionActivityForm } from '@/forms/completion-activity-form'
 import { StartActivityForm } from '@/forms/start-activity-form'
+import { stringToColor } from '@/lib/colors'
 import { getFormConfigForAgeGroup } from '@/lib/completionFormConfig'
 import {
   getParticipantAgeGroup,
   getParticipantDisplayName,
 } from '@/lib/participants'
+import { cn } from '@/lib/utils'
 
 export default function CardPage() {
   const account = useQuery(api.accounts.getMyAccount, {})
@@ -94,9 +97,17 @@ export default function CardPage() {
     (completions ?? []).map((c) => [c.bingoSquareId, c]),
   )
 
+  const percentCompmleted =
+    (completions?.length ?? 0) / (cardWithSquares?.squares.length ?? 0)
+
   return (
     <div className="space-y-6 flex flex-col w-full max-w-prose mx-auto">
-      <h1 className="text-2xl font-bold">BINGO Card</h1>
+      <div className="w-full flex items-center justify-between">
+        <h1 className="text-2xl font-bold">My Bingo Card</h1>
+        <p className="text-sm text-muted-foreground">
+          {(percentCompmleted * 100).toFixed(0)}% completed
+        </p>
+      </div>
 
       {account?.type !== 'family' && participants.length > 1 && (
         <div className="text-sm text-muted-foreground">
@@ -119,8 +130,8 @@ export default function CardPage() {
       )}
 
       {cardWithSquares && (
-        <div className="grid grid-cols-5 gap-2 max-w-2xl">
-          {cardWithSquares.squares.map((sq) => {
+        <div className="grid grid-cols-5 border border-black rounded-lg overflow-hidden">
+          {cardWithSquares.squares.map((sq, idx) => {
             const comp = completionBySquare.get(sq._id)
             const isCompleted = comp?.completedAt != null
             const isStarted = comp != null
@@ -148,22 +159,35 @@ export default function CardPage() {
                     })
                   }
                 }}
-                className={`
-                  aspect-square rounded-lg border p-2 text-left text-sm transition
-                  ${isCompleted ? 'bg-primary/20 border-primary' : 'hover:bg-muted'}
-                `}
+                className={cn(
+                  'aspect-square relative border-black border-b border-r p-3 text-center text-base leading-snug font-semibold text-black transition',
+                  (idx + 1) % 5 === 0 ? 'border-r-0' : '',
+                  idx + 1 > 20 ? 'border-b-0' : '',
+                  isCompleted ? 'text-green-900' : '',
+                )}
+                style={{
+                  boxShadow: `inset 0 0 ${!isCompleted ? '10px' : '60px'} 2px ${
+                    isCompleted
+                      ? '#00c950'
+                      : stringToColor(sq.activityName ?? '', {
+                          lightnessMin: 40,
+                          lightnessMax: 41,
+                        })
+                  }`,
+                }}
               >
-                <span className="font-medium line-clamp-3">
+                <span className="font-medium line-clamp-3 text-pretty">
                   {sq.activityName}
                 </span>
                 {isCompleted && (
-                  <span className="text-xs text-muted-foreground block mt-1">
+                  <span className="absolute top-1 left-1 gap-1 flex items-center justify-center text-xs">
+                    <Check className="size-4" />
                     Done
                   </span>
                 )}
                 {isStarted && !isCompleted && (
-                  <span className="text-xs text-muted-foreground block mt-1">
-                    In progress
+                  <span className="text-xs block mt-1 left-1/2 -translate-x-1/2 w-max absolute bottom-full mx-auto translate-y-1/2 bg-sky-600 rounded-sm text-sky-100 px-2 py-px">
+                    <span className="animate-pulse">In progress</span>
                   </span>
                 )}
               </button>
@@ -183,13 +207,13 @@ export default function CardPage() {
           {squareModal && (
             <StartActivityForm
               loading={loading}
-              onSubmit={async (values) => {
+              onSubmit={async () => {
                 setLoading(true)
                 try {
                   await startActivity({
                     bingoSquareId: squareModal.squareId,
                     participantId: squareModal.participantId,
-                    startedAt: new Date(values.startDate).getTime(),
+                    startedAt: new Date().getTime(),
                   })
                   setSquareModal(null)
                 } finally {
