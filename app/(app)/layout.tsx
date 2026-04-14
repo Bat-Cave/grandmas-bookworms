@@ -9,17 +9,19 @@ import {
   useAuth,
 } from '@clerk/nextjs'
 import { useQuery } from 'convex/react'
+import { Book, Home, MessageCircle, Shield, Trophy, Users } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { FamilyGate } from '@/components/family/family-gate'
 import {
   FamilySessionProvider,
   useFamilySession,
 } from '@/components/family/family-session'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { api } from '@/convex/_generated/api'
 import { getParticipantDisplayName } from '@/lib/participants'
+import { cn } from '@/lib/utils'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -107,6 +109,7 @@ function AppFrame({
   accountType: 'individual' | 'family'
   children: React.ReactNode
 }) {
+  const pathname = usePathname()
   const participants = useQuery(api.participants.listMyParticipants, {})
   const { activeParticipantId, lockSession } = useFamilySession()
   const activeParticipant = participants?.find(
@@ -120,27 +123,71 @@ function AppFrame({
   return (
     <div className="min-h-screen flex flex-col">
       <nav className="border-b px-4 py-3 flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex gap-4 items-center w-full">
-          <Link href="/dashboard" className="font-medium hover:underline">
-            Dashboard
+        <div className="flex items-center gap-1 w-full">
+          <Link
+            href="/dashboard"
+            className={cn(
+              buttonVariants({
+                variant: pathname === '/dashboard' ? 'default' : 'ghost',
+              }),
+            )}
+          >
+            <Home className="size-4" /> Dashboard
           </Link>
-          <Link href="/card" className="font-medium hover:underline">
-            My Card
+          <Link
+            href="/card"
+            className={cn(
+              buttonVariants({
+                variant: pathname === '/card' ? 'default' : 'ghost',
+              }),
+            )}
+          >
+            <Book className="size-4" /> My Card
           </Link>
-          <Link href="/messages" className="font-medium hover:underline">
-            Messages
+          <Link
+            href="/messages"
+            className={cn(
+              buttonVariants({
+                variant: pathname === '/messages' ? 'default' : 'ghost',
+              }),
+            )}
+          >
+            <MessageCircle className="size-4" /> Messages
           </Link>
-          <Link href="/rewards" className="font-medium hover:underline">
-            Rewards
+          <Link
+            href="/rewards"
+            className={cn(
+              buttonVariants({
+                variant: pathname === '/rewards' ? 'default' : 'ghost',
+              }),
+            )}
+          >
+            <Trophy className="size-4" /> Rewards
           </Link>
           {canAccessOrganization && (
-            <Link href="/organization" className="font-medium hover:underline">
-              Organization
+            <Link
+              href="/organization"
+              className={cn(
+                buttonVariants({
+                  variant: pathname.startsWith('/organization')
+                    ? 'default'
+                    : 'ghost',
+                }),
+              )}
+            >
+              <Shield className="size-4" /> Organization
             </Link>
           )}
           {isParent && (
-            <Link href="/family" className="font-medium hover:underline">
-              Family
+            <Link
+              href="/family"
+              className={cn(
+                buttonVariants({
+                  variant: pathname === '/family' ? 'default' : 'ghost',
+                }),
+              )}
+            >
+              <Users className="size-4" /> Family
             </Link>
           )}
 

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAgeGroupFromBirthday } from "./ageGroup";
+import { ensureDefaultActivitiesForOrganization } from "./baseActivities";
 import { requireMyAccountWithOrganization } from "./lib/authz";
 
 const FREE_POSITION = 12; // center of 5x5 (row 2, col 2)
@@ -20,6 +21,8 @@ export const getOrCreateForParticipant = mutation({
   returns: v.id("bingoCards"),
   handler: async (ctx, args) => {
     const myAccount = await requireMyAccountWithOrganization(ctx);
+    const organizationId = myAccount.organizationId;
+    if (!organizationId) throw new Error("MEMBERSHIP_REQUIRED");
     const participant = await ctx.db.get(args.participantId);
     if (!participant) throw new Error("PARTICIPANT_NOT_FOUND");
     const account = await ctx.db.get(participant.accountId);
@@ -39,7 +42,13 @@ export const getOrCreateForParticipant = mutation({
       .unique();
     if (existing) return existing._id;
 
-    const activities = await ctx.db.query("baseActivities").collect();
+    await ensureDefaultActivitiesForOrganization(ctx, organizationId);
+    const activities = await ctx.db
+      .query("baseActivities")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", organizationId)
+      )
+      .collect();
     const participantAgeGroup = getAgeGroupFromBirthday(participant.birthday);
     const eligible = activities.filter((a) => {
       if (a.ageGroup === "All") return true;
@@ -63,6 +72,14 @@ export const getOrCreateForParticipant = mutation({
         bingoCardId: cardId,
         position: pos,
         baseActivityId,
+        activityName:
+          pos === FREE_POSITION ? "FREE" : picked[activityIndex - 1]?.name,
+        activityDescription:
+          pos === FREE_POSITION
+            ? "This center square is already free."
+            : picked[activityIndex - 1]?.description,
+        raffleValue:
+          pos === FREE_POSITION ? 0 : picked[activityIndex - 1]?.raffleValue,
       });
     }
     return cardId;
@@ -123,6 +140,7 @@ export const getCardWithSquares = query({
           _id: v.id("bingoSquares"),
           position: v.number(),
           baseActivityId: v.optional(v.id("baseActivities")),
+          activityDescription: v.union(v.string(), v.null()),
           activityName: v.union(v.string(), v.null()),
         })
       ),
@@ -157,12 +175,18 @@ export const getCardWithSquares = query({
     const squaresWithNames = await Promise.all(
       squares.map(async (s) => {
         const activityName = s.baseActivityId
-          ? (await ctx.db.get(s.baseActivityId))?.name ?? null
+          ? s.activityName ?? (await ctx.db.get(s.baseActivityId))?.name ?? null
           : "FREE";
+        const activityDescription = s.baseActivityId
+          ? s.activityDescription ??
+            (await ctx.db.get(s.baseActivityId))?.description ??
+            null
+          : s.activityDescription ?? "This center square is already free.";
         return {
           _id: s._id,
           position: s.position,
           baseActivityId: s.baseActivityId,
+          activityDescription,
           activityName,
         };
       })

@@ -1,55 +1,27 @@
 'use client'
 
 import { useMutation, useQuery } from 'convex/react'
-import { useMemo, useState } from 'react'
+import { ArrowRight, KeyRound, Shapes } from 'lucide-react'
+import Link from 'next/link'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { api } from '@/convex/_generated/api'
-import type { Id } from '@/convex/_generated/dataModel'
 import { toUserErrorMessage } from '@/lib/error-messages'
-
-function formatDateTime(value: number) {
-  return new Date(value).toLocaleString()
-}
 
 export default function OrganizationPage() {
   const membership = useQuery(api.organizations.getMyMembership, {})
-  const invites = useQuery(
-    api.organizations.listMyOrganizationInvites,
+  const roster = useQuery(
+    api.organizations.getMyOrganizationRoster,
     membership?.role === 'admin' ? {} : 'skip',
   )
-  const createInvite = useMutation(api.organizations.createInvite)
-  const revokeInvite = useMutation(api.organizations.revokeInvite)
-
-  const [maxUses, setMaxUses] = useState('')
-  const [expiresAt, setExpiresAt] = useState('')
-  const [latestCode, setLatestCode] = useState<string | null>(null)
-  const [copiedInviteId, setCopiedInviteId] = useState<Id<'organizationInvites'> | null>(
-    null,
-  )
-  const [copied, setCopied] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
-  const [revokingId, setRevokingId] = useState<Id<'organizationInvites'> | null>(
-    null,
-  )
-
-  const canManage = membership?.role === 'admin'
-
-  const inviteStats = useMemo(() => {
-    const all = invites ?? []
-    const active = all.filter((invite) => !invite.isRevoked && !invite.isExpired)
-    return {
-      total: all.length,
-      active: active.length,
-    }
-  }, [invites])
+  const revokeMember = useMutation(api.organizations.revokeMember)
+  const [removingOwnerId, setRemovingOwnerId] = useState<string | null>(null)
+  const [memberError, setMemberError] = useState<string | null>(null)
 
   if (
     membership === undefined ||
-    (membership?.role === 'admin' && invites === undefined)
+    (membership?.role === 'admin' && roster === undefined)
   ) {
     return <p className="text-muted-foreground">Loading...</p>
   }
@@ -58,232 +30,196 @@ export default function OrganizationPage() {
     return <p className="text-muted-foreground">Join an organization first.</p>
   }
 
-  if (!canManage) {
+  if (membership.role !== 'admin') {
     return (
       <p className="text-muted-foreground">
-        Only organization admins can manage invites.
+        Only organization admins can access organization settings.
       </p>
     )
   }
 
-  const handleCreateInvite = async () => {
-    if (!membership) return
-
-    setError(null)
-    setCreating(true)
+  const handleRemoveMember = async (ownerId: string) => {
+    setMemberError(null)
+    setRemovingOwnerId(ownerId)
     try {
-      const parsedMaxUses = maxUses.trim() ? Number(maxUses.trim()) : undefined
-      if (parsedMaxUses !== undefined) {
-        if (!Number.isInteger(parsedMaxUses) || parsedMaxUses <= 0) {
-          setError('Max uses must be a positive whole number.')
-          return
-        }
-      }
-
-      const parsedExpiresAt = expiresAt.trim()
-        ? new Date(expiresAt.trim()).getTime()
-        : undefined
-      if (parsedExpiresAt !== undefined) {
-        if (Number.isNaN(parsedExpiresAt)) {
-          setError('Expiration must be a valid date/time.')
-          return
-        }
-        if (parsedExpiresAt <= Date.now()) {
-          setError('Expiration must be in the future.')
-          return
-        }
-      }
-
-      const result = await createInvite({
-        organizationId: membership.organizationId,
-        maxUses: parsedMaxUses,
-        expiresAt: parsedExpiresAt,
-      })
-      setLatestCode(result.code)
-      setCopied(false)
-      setMaxUses('')
-      setExpiresAt('')
-    } catch (err) {
-      setError(toUserErrorMessage(err, 'Failed to create invite'))
+      await revokeMember({ ownerId })
+    } catch (error) {
+      setMemberError(toUserErrorMessage(error, 'Failed to remove member'))
     } finally {
-      setCreating(false)
-    }
-  }
-
-  const handleCopyLatestCode = async () => {
-    if (!latestCode) return
-    try {
-      await navigator.clipboard.writeText(latestCode)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      setError('Could not copy invite code. Please copy it manually.')
-    }
-  }
-
-  const handleCopyInviteCode = async (
-    inviteId: Id<'organizationInvites'>,
-    code?: string,
-  ) => {
-    if (!code) {
-      setError('This older invite does not have a stored code.')
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(code)
-      setCopiedInviteId(inviteId)
-      setTimeout(() => setCopiedInviteId(null), 1500)
-    } catch {
-      setError('Could not copy invite code. Please copy it manually.')
-    }
-  }
-
-  const handleRevoke = async (inviteId: Id<'organizationInvites'>) => {
-    setError(null)
-    setRevokingId(inviteId)
-    try {
-      await revokeInvite({ inviteId })
-    } catch (err) {
-      setError(toUserErrorMessage(err, 'Failed to revoke invite'))
-    } finally {
-      setRevokingId(null)
+      setRemovingOwnerId(null)
     }
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Organization Invites</h1>
+    <div className="space-y-6 max-w-4xl">
+      <div className="space-y-2">
+        <h1 className="text-2xl font-bold">Organization Admin</h1>
+        <p className="text-muted-foreground">
+          Choose what you want to manage for {membership.organizationName}.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Link href="/organization/activities" className="block">
+          <Card className="h-full transition hover:border-foreground/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shapes className="size-5" />
+                Activities
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Add, edit, or delete the activities that appear on future bingo cards.
+              </p>
+              <p className="text-sm font-medium flex items-center gap-2">
+                Open activities
+                <ArrowRight className="size-4" />
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/organization/invites" className="block">
+          <Card className="h-full transition hover:border-foreground/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <KeyRound className="size-5" />
+                Invite Codes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Create and revoke invite codes for families and members joining the
+                organization.
+              </p>
+              <p className="text-sm font-medium flex items-center gap-2">
+                Open invites
+                <ArrowRight className="size-4" />
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Create invite</CardTitle>
+          <CardTitle>Organization members</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="maxUses">Max uses (optional)</Label>
-              <Input
-                id="maxUses"
-                inputMode="numeric"
-                value={maxUses}
-                onChange={(event) => setMaxUses(event.target.value)}
-                placeholder="e.g. 10"
-              />
+          {memberError ? (
+            <p className="text-sm text-destructive">{memberError}</p>
+          ) : null}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Accounts</p>
+              <p className="text-xl font-semibold">{roster?.totals.accounts ?? 0}</p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="expiresAt">Expires at (optional)</Label>
-              <Input
-                id="expiresAt"
-                type="datetime-local"
-                value={expiresAt}
-                onChange={(event) => setExpiresAt(event.target.value)}
-              />
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Families</p>
+              <p className="text-xl font-semibold">{roster?.totals.families ?? 0}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Individuals</p>
+              <p className="text-xl font-semibold">{roster?.totals.individuals ?? 0}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Participants</p>
+              <p className="text-xl font-semibold">
+                {roster?.totals.participants ?? 0}
+              </p>
             </div>
           </div>
 
-          {latestCode ? (
-            <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-              <p className="text-sm font-medium">Share this invite code now</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-base font-semibold">{latestCode}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyLatestCode}
-                  disabled={creating}
-                >
-                  {copied ? 'Copied' : 'Copy code'}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Invite codes are only shown once for security.
-              </p>
-            </div>
-          ) : null}
-
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-          <Button onClick={handleCreateInvite} disabled={creating || revokingId !== null}>
-            {creating ? 'Creating...' : 'Create invite'}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Invites ({inviteStats.active} active / {inviteStats.total} total)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="mb-3 text-xs text-muted-foreground">
-            You can copy invite codes from this list at any time.
-          </p>
-          {(invites ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No invites yet.</p>
-          ) : (
-            <ul className="space-y-3">
-              {(invites ?? []).map((invite) => {
-                const exhausted =
-                  invite.maxUses !== undefined && invite.useCount >= invite.maxUses
-                const status = invite.isRevoked
-                  ? 'Revoked'
-                  : invite.isExpired
-                    ? 'Expired'
-                    : exhausted
-                      ? 'Exhausted'
-                      : 'Active'
-
-                return (
-                  <li key={invite._id} className="rounded-md border p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1 text-sm">
-                        <p>
-                          Code:{' '}
-                          <span className="font-mono">
-                            {invite.code ?? 'Unavailable'}
-                          </span>
+          {(roster?.families.length ?? 0) > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Families</h3>
+              <ul className="space-y-2">
+                {(roster?.families ?? []).map((family) => (
+                  <li key={family.accountId} className="rounded-md border p-3 text-sm">
+                    {(() => {
+                      const isCurrentUser = family.ownerId === membership.ownerId
+                      return (
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{family.displayName}</p>
+                        <p className="text-muted-foreground">
+                          {family.participantCount} participants
                         </p>
-                        <p>Status: {status}</p>
-                        <p>Created: {formatDateTime(invite.createdAt)}</p>
-                        <p>
-                          Uses: {invite.useCount}
-                          {invite.maxUses !== undefined
-                            ? ` / ${invite.maxUses}`
-                            : ' / unlimited'}
-                        </p>
-                        <p>
-                          Expires:{' '}
-                          {invite.expiresAt
-                            ? formatDateTime(invite.expiresAt)
-                            : 'never'}
+                        <p className="mt-1 text-muted-foreground">
+                          {family.members
+                            .map((member) =>
+                              member.role === 'owner'
+                                ? `${member.name} (owner${family.ownerId === membership.ownerId ? ', me' : ''})`
+                                : member.name,
+                            )
+                            .join(', ')}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      {isCurrentUser ? (
+                        <span className="text-xs text-muted-foreground">Current user</span>
+                      ) : (
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={!invite.code || creating}
-                          onClick={() => handleCopyInviteCode(invite._id, invite.code)}
+                          onClick={() => handleRemoveMember(family.ownerId)}
+                          disabled={removingOwnerId === family.ownerId}
                         >
-                          {copiedInviteId === invite._id ? 'Copied' : 'Copy code'}
+                          {removingOwnerId === family.ownerId ? 'Removing...' : 'Remove'}
                         </Button>
-                        {!invite.isRevoked ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={revokingId === invite._id || creating}
-                            onClick={() => handleRevoke(invite._id)}
-                          >
-                            {revokingId === invite._id ? 'Revoking...' : 'Revoke'}
-                          </Button>
-                        ) : null}
-                      </div>
+                      )}
                     </div>
+                      )
+                    })()}
                   </li>
-                )
-              })}
-            </ul>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {(roster?.individuals.length ?? 0) > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Individuals</h3>
+              <ul className="space-y-2">
+                {(roster?.individuals ?? []).map((individual) => (
+                  <li
+                    key={individual.accountId}
+                    className="rounded-md border p-3 text-sm"
+                  >
+                    {(() => {
+                      const isCurrentUser = individual.ownerId === membership.ownerId
+                      return (
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{individual.displayName}</p>
+                            <p className="text-muted-foreground">
+                              {(individual.members[0]?.name ?? 'Unknown')} (owner
+                              {individual.ownerId === membership.ownerId ? ', me' : ''})
+                            </p>
+                          </div>
+                          {isCurrentUser ? (
+                            <span className="text-xs text-muted-foreground">
+                              Current user
+                            </span>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRemoveMember(individual.ownerId)}
+                              disabled={removingOwnerId === individual.ownerId}
+                            >
+                              {removingOwnerId === individual.ownerId
+                                ? 'Removing...'
+                                : 'Remove'}
+                            </Button>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </CardContent>
       </Card>

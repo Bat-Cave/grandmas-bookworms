@@ -161,9 +161,9 @@ export default function MessagesPage() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col gap-4 md:flex-row md:gap-6">
-      <Card className="flex w-full shrink-0 flex-col md:w-72">
+      <Card className="flex w-full shrink-0 gap-0 flex-col md:w-72">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-lg">Conversations</CardTitle>
+          <CardTitle className="text-lg">Messages</CardTitle>
           <Button
             variant="outline"
             size="sm"

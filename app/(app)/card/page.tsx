@@ -53,6 +53,7 @@ export default function CardPage() {
   const [squareModal, setSquareModal] = useState<{
     squareId: Id<'bingoSquares'>
     activityName: string
+    activityDescription: string | null
     position: number
     participantId: Id<'participants'>
     participantAgeGroup: string
@@ -97,7 +98,7 @@ export default function CardPage() {
     (completions ?? []).map((c) => [c.bingoSquareId, c]),
   )
 
-  const percentCompmleted =
+  const percentCompleted =
     (completions?.length ?? 0) / (cardWithSquares?.squares.length ?? 0)
 
   return (
@@ -105,7 +106,7 @@ export default function CardPage() {
       <div className="w-full flex items-center justify-between">
         <h1 className="text-2xl font-bold">My Bingo Card</h1>
         <p className="text-sm text-muted-foreground">
-          {(percentCompmleted * 100).toFixed(0)}% completed
+          {(percentCompleted * 100).toFixed(0)}% completed
         </p>
       </div>
 
@@ -130,7 +131,7 @@ export default function CardPage() {
       )}
 
       {cardWithSquares && (
-        <div className="grid grid-cols-5 border border-black rounded-lg overflow-hidden">
+        <div className="grid grid-cols-5 border border-black bg-linear-to-br from-accent via-primary to-accent animate-gradient bg-size-[400%_400%] rounded-lg">
           {cardWithSquares.squares.map((sq, idx) => {
             const comp = completionBySquare.get(sq._id)
             const isCompleted = comp?.completedAt != null
@@ -153,6 +154,7 @@ export default function CardPage() {
                     setSquareModal({
                       squareId: sq._id,
                       activityName: sq.activityName ?? 'Activity',
+                      activityDescription: sq.activityDescription ?? null,
                       position: sq.position,
                       participantId: cardWithSquares.card.participantId,
                       participantAgeGroup,
@@ -160,15 +162,29 @@ export default function CardPage() {
                   }
                 }}
                 className={cn(
-                  'aspect-square relative border-black border-b border-r p-3 text-center text-base leading-snug font-semibold text-black transition',
+                  'aspect-square relative border-black bg-white border-b border-r p-3 text-center text-base leading-snug font-semibold text-black transition',
+                  idx === 0 && 'rounded-tl-lg',
+                  idx === 4 && 'rounded-tr-lg',
+                  idx === 20 && 'rounded-bl-lg',
+                  idx === 24 && 'rounded-br-lg',
                   (idx + 1) % 5 === 0 ? 'border-r-0' : '',
                   idx + 1 > 20 ? 'border-b-0' : '',
-                  isCompleted ? 'text-green-900' : '',
+                  isCompleted ? 'bg-transparent text-gray-200' : '',
+                  isCompleted &&
+                    idx < 21 &&
+                    completionBySquare.get(cardWithSquares.squares[idx + 5]._id)
+                      ?.completedAt != null &&
+                    'border-b-0',
+                  isCompleted &&
+                    idx < 24 &&
+                    completionBySquare.get(cardWithSquares.squares[idx + 1]._id)
+                      ?.completedAt != null &&
+                    'border-r-0',
                 )}
                 style={{
                   boxShadow: `inset 0 0 ${!isCompleted ? '10px' : '60px'} 2px ${
                     isCompleted
-                      ? '#00c950'
+                      ? 'transparent'
                       : stringToColor(sq.activityName ?? '', {
                           lightnessMin: 40,
                           lightnessMax: 41,
@@ -200,12 +216,13 @@ export default function CardPage() {
         open={!!squareModal}
         onOpenChange={(open) => !open && setSquareModal(null)}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] min-h-[30vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{squareModal?.activityName ?? ''}</DialogTitle>
           </DialogHeader>
           {squareModal && (
             <StartActivityForm
+              activityDescription={squareModal.activityDescription}
               loading={loading}
               onSubmit={async () => {
                 setLoading(true)

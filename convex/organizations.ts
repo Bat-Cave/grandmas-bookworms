@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import {
   getActiveMembershipByOwnerId,
   requireActiveMembershipByOwnerId,
@@ -34,7 +35,27 @@ const toSlug = (value: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
 
+const formatParticipantName = (
+  participant: { firstName?: string; lastName?: string } | null | undefined,
+) => {
+  if (!participant) return "Unknown";
+  const full = `${participant.firstName ?? ""} ${participant.lastName ?? ""}`.trim();
+  return full || "Unknown";
+};
+
 type Ctx = MutationCtx | QueryCtx;
+type RosterMember = {
+  participantId: Id<"participants">;
+  name: string;
+  role: "owner" | "member";
+};
+type RosterGroup = {
+  accountId: Id<"accounts">;
+  displayName: string;
+  ownerId: string;
+  participantCount: number;
+  members: RosterMember[];
+};
 
 const uniqueSlug = async (ctx: Ctx, baseName: string) => {
   const base = toSlug(baseName) || "book-club";
@@ -191,6 +212,71 @@ export const revokeInvite = mutation({
   },
 });
 
+export const revokeMember = mutation({
+  args: {
+    ownerId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx);
+    const { membership } = await requireActiveMembershipByOwnerId(ctx, identity.subject);
+
+    if (membership.role !== "admin") {
+      throw new Error("FORBIDDEN");
+    }
+    if (args.ownerId === identity.subject) {
+      throw new Error("CANNOT_REMOVE_YOURSELF");
+    }
+
+    const targetMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_owner", (q) =>
+        q.eq("organizationId", membership.organizationId).eq("ownerId", args.ownerId),
+      )
+      .unique();
+
+    if (!targetMembership || targetMembership.status !== "active") {
+      throw new Error("MEMBER_NOT_FOUND");
+    }
+
+    if (targetMembership.role === "admin") {
+      const activeMemberships = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org", (q) => q.eq("organizationId", membership.organizationId))
+        .collect();
+      const activeAdminCount = activeMemberships.filter(
+        (orgMembership) =>
+          orgMembership.status === "active" && orgMembership.role === "admin",
+      ).length;
+
+      if (activeAdminCount <= 1) {
+        throw new Error("LAST_ADMIN_CANNOT_BE_REMOVED");
+      }
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(targetMembership._id, {
+      status: "revoked",
+      revokedAt: now,
+    });
+
+    const accounts = await ctx.db
+      .query("accounts")
+      .withIndex("by_owner", (q) => q.eq("ownerId", args.ownerId))
+      .collect();
+
+    for (const account of accounts) {
+      if (account.organizationId === membership.organizationId) {
+        await ctx.db.patch(account._id, {
+          organizationId: undefined,
+        });
+      }
+    }
+
+    return null;
+  },
+});
+
 export const joinOrganizationByInvite = mutation({
   args: {
     code: v.string(),
@@ -305,5 +391,117 @@ export const listMyOrganizationInvites = query({
       isRevoked: Boolean(invite.revokedAt),
       isExpired: invite.expiresAt !== undefined && invite.expiresAt < now,
     }));
+  },
+});
+
+export const getMyOrganizationRoster = query({
+  args: {},
+  returns: v.object({
+    totals: v.object({
+      accounts: v.number(),
+      families: v.number(),
+      individuals: v.number(),
+      participants: v.number(),
+    }),
+    families: v.array(
+      v.object({
+        accountId: v.id("accounts"),
+        displayName: v.string(),
+        ownerId: v.string(),
+        participantCount: v.number(),
+        members: v.array(
+          v.object({
+            participantId: v.id("participants"),
+            name: v.string(),
+            role: v.union(v.literal("owner"), v.literal("member")),
+          }),
+        ),
+      }),
+    ),
+    individuals: v.array(
+      v.object({
+        accountId: v.id("accounts"),
+        displayName: v.string(),
+        ownerId: v.string(),
+        participantCount: v.number(),
+        members: v.array(
+          v.object({
+            participantId: v.id("participants"),
+            name: v.string(),
+            role: v.union(v.literal("owner"), v.literal("member")),
+          }),
+        ),
+      }),
+    ),
+  }),
+  handler: async (ctx) => {
+    const identity = await requireIdentity(ctx);
+    const { membership } = await requireActiveMembershipByOwnerId(ctx, identity.subject);
+    if (membership.role !== "admin") {
+      throw new Error("FORBIDDEN");
+    }
+
+    const orgMemberships = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org", (q) => q.eq("organizationId", membership.organizationId))
+      .collect();
+    const activeOwnerIds = new Set(
+      orgMemberships.filter((m) => m.status === "active").map((m) => m.ownerId),
+    );
+
+    const orgAccounts = (await ctx.db.query("accounts").collect()).filter((account) =>
+      activeOwnerIds.has(account.ownerId),
+    );
+
+    const families: RosterGroup[] = [];
+    const individuals: RosterGroup[] = [];
+
+    let participantTotal = 0;
+    for (const account of orgAccounts) {
+      const participants = await ctx.db
+        .query("participants")
+        .withIndex("by_account", (q) => q.eq("accountId", account._id))
+        .collect();
+
+      const members = participants
+        .map((p) => ({
+          participantId: p._id,
+          name: formatParticipantName(p),
+          role: p.role,
+        }))
+        .sort((a, b) => {
+          if (a.role === b.role) return a.name.localeCompare(b.name);
+          return a.role === "owner" ? -1 : 1;
+        });
+
+      const row = {
+        accountId: account._id,
+        displayName: account.displayName,
+        ownerId: account.ownerId,
+        participantCount: members.length,
+        members,
+      };
+      participantTotal += members.length;
+
+      if (account.type === "family") {
+        families.push(row);
+      } else {
+        individuals.push(row);
+      }
+    }
+
+    families.sort((a, b) => a.displayName.localeCompare(b.displayName));
+    individuals.sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    return {
+      totals: {
+        accounts: orgAccounts.length,
+        families: families.length,
+        individuals: individuals.length,
+        participants: participantTotal,
+      },
+      families,
+      individuals,
+    };
   },
 });

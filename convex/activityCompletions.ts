@@ -85,7 +85,9 @@ export const completeActivity = mutation({
     });
 
     let raffleValue = 0;
-    if (square.baseActivityId) {
+    if (square.raffleValue !== undefined) {
+      raffleValue = square.raffleValue;
+    } else if (square.baseActivityId) {
       const activity = await ctx.db.get(square.baseActivityId);
       if (activity) raffleValue = activity.raffleValue;
     }

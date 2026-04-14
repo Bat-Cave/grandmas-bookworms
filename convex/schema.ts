@@ -64,12 +64,14 @@ export default defineSchema({
     .index('by_account_and_role', ['accountId', 'role']),
 
   baseActivities: defineTable({
+    organizationId: v.optional(v.id('organizations')),
     name: v.string(),
+    description: v.string(),
     ageGroup: v.string(),
     activityType: v.union(v.literal('reading'), v.literal('activity')),
     raffleValue: v.number(),
     baseActivityId: v.optional(v.string()),
-  }),
+  }).index('by_organization', ['organizationId']),
 
   bingoCards: defineTable({
     participantId: v.id('participants'),
@@ -80,6 +82,9 @@ export default defineSchema({
     bingoCardId: v.id('bingoCards'),
     position: v.number(),
     baseActivityId: v.optional(v.id('baseActivities')),
+    activityName: v.optional(v.string()),
+    activityDescription: v.optional(v.string()),
+    raffleValue: v.optional(v.number()),
   }).index('by_card', ['bingoCardId']),
 
   activityCompletions: defineTable({

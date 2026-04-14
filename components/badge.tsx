@@ -41,7 +41,7 @@ export const Badge = ({
                   <Iridescence color={[0.9, 0.9, 0.9]} />
                 )}
               </div>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-shadow-lg">
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-shadow-lg px-2">
                 <p className="text-[30cqw] leading-none font-bold">{content}</p>
                 <p className="max-w-28 text-center text-[14cqw] leading-[14cqw] font-semibold mt-[5cqw]">
                   {label}

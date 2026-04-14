@@ -66,6 +66,12 @@ export async function requireActiveMembership(ctx: ConvexAuthCtx) {
   return await requireActiveMembershipByOwnerId(ctx, identity.subject);
 }
 
+export async function requireAdminMembership(ctx: ConvexAuthCtx) {
+  const { membership, organization } = await requireActiveMembership(ctx);
+  if (membership.role !== "admin") throw new Error("FORBIDDEN");
+  return { membership, organization };
+}
+
 export async function requireMyAccountWithOrganization(ctx: ConvexAuthCtx) {
   const identity = await requireIdentity(ctx);
   return await requireAccountWithOrganizationByOwnerId(ctx, identity.subject);
