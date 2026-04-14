@@ -1,34 +1,34 @@
-'use client'
+"use client";
 
-import { useQuery } from 'convex/react'
-import { Badge } from '@/components/badge'
-import { useFamilySession } from '@/components/family/family-session'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { getBadgeDisplayInfo } from '@/convex/badges/config'
-import { api } from '@/convex/_generated/api'
-import { getBadgeIcon } from '@/lib/badges/icons'
+import { useQuery } from "convex/react";
+import { Badge } from "@/components/badge";
+import { useFamilySession } from "@/components/family/family-session";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { api } from "@/convex/_generated/api";
+import { getBadgeDisplayInfo } from "@/convex/badges/config";
+import { getBadgeIcon } from "@/lib/badges/icons";
 
 export default function RewardsPage() {
-  const account = useQuery(api.accounts.getMyAccount, {})
-  const participants = useQuery(api.participants.listMyParticipants, {})
+  const account = useQuery(api.accounts.getMyAccount, {});
+  const participants = useQuery(api.participants.listMyParticipants, {});
   const raffleByParticipant = useQuery(
     api.rewards.getRaffleTicketsForMyParticipants,
     {},
-  )
-  const { activeParticipantId } = useFamilySession()
+  );
+  const { activeParticipantId } = useFamilySession();
 
   const currentId =
-    account?.type === 'family'
+    account?.type === "family"
       ? activeParticipantId
-      : (participants?.[0]?._id ?? null)
+      : (participants?.[0]?._id ?? null);
   const badges = useQuery(
     api.rewards.getBadgesForParticipant,
-    currentId ? { participantId: currentId } : 'skip',
-  )
+    currentId ? { participantId: currentId } : "skip",
+  );
   const bingoLines = useQuery(
     api.rewards.getBingoLinesForParticipant,
-    currentId ? { participantId: currentId } : 'skip',
-  )
+    currentId ? { participantId: currentId } : "skip",
+  );
 
   return (
     <div className="space-y-8">
@@ -49,7 +49,7 @@ export default function RewardsPage() {
             <p className="text-muted-foreground">No participants yet.</p>
           ) : (
             <ul className="space-y-2">
-              {(account?.type === 'family' && currentId
+              {(account?.type === "family" && currentId
                 ? raffleByParticipant.filter(
                     (r) => r.participantId === currentId,
                   )
@@ -81,11 +81,11 @@ export default function RewardsPage() {
               ) : (
                 <ul className="flex flex-wrap gap-4">
                   {badges.map((b) => {
-                    const info = getBadgeDisplayInfo(b.badgeId)
-                    const name = info?.name ?? b.badgeId
-                    const description = info?.description
-                    const tier = info?.tier ?? 'base'
-                    const Icon = info ? getBadgeIcon(info.icon) : null
+                    const info = getBadgeDisplayInfo(b.badgeId);
+                    const name = info?.name ?? b.badgeId;
+                    const description = info?.description;
+                    const tier = info?.tier ?? "base";
+                    const Icon = info ? getBadgeIcon(info.icon) : null;
                     return (
                       <li
                         key={`${b.badgeId}-${b.earnedAt}`}
@@ -111,7 +111,7 @@ export default function RewardsPage() {
                           </p>
                         )}
                       </li>
-                    )
+                    );
                   })}
                 </ul>
               )}
@@ -130,12 +130,12 @@ export default function RewardsPage() {
                 <ul className="space-y-1">
                   {bingoLines.map((l, i) => (
                     <li key={i}>
-                      {l.lineType}{' '}
-                      {l.lineType !== 'diagonal'
+                      {l.lineType}{" "}
+                      {l.lineType !== "diagonal"
                         ? l.lineIndex + 1
                         : l.lineIndex === 0
-                          ? '\\'
-                          : '/'}
+                          ? "\\"
+                          : "/"}
                     </li>
                   ))}
                 </ul>
@@ -145,5 +145,5 @@ export default function RewardsPage() {
         </>
       )}
     </div>
-  )
+  );
 }
