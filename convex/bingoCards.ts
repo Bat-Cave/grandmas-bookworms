@@ -1,7 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAgeGroupFromBirthday } from "./ageGroup";
-import { ensureDefaultActivitiesForOrganization } from "./baseActivities";
+import {
+  defaultActivityDescription,
+  ensureDefaultActivitiesForOrganization,
+} from "./baseActivities";
 import { requireMyAccountWithOrganization } from "./lib/authz";
 
 const FREE_POSITION = 12; // center of 5x5 (row 2, col 2)
@@ -68,16 +71,19 @@ export const getOrCreateForParticipant = mutation({
     for (let pos = 0; pos < 25; pos++) {
       const baseActivityId =
         pos === FREE_POSITION ? undefined : picked[activityIndex++]!._id;
+      const assigned =
+        pos === FREE_POSITION ? undefined : picked[activityIndex - 1]!;
       await ctx.db.insert("bingoSquares", {
         bingoCardId: cardId,
         position: pos,
         baseActivityId,
         activityName:
-          pos === FREE_POSITION ? "FREE" : picked[activityIndex - 1]?.name,
+          pos === FREE_POSITION ? "FREE" : assigned?.name,
         activityDescription:
           pos === FREE_POSITION
             ? "This center square is already free."
-            : picked[activityIndex - 1]?.description,
+            : assigned!.description ??
+              defaultActivityDescription(assigned!.name),
         raffleValue:
           pos === FREE_POSITION ? 0 : picked[activityIndex - 1]?.raffleValue,
       });
@@ -174,13 +180,18 @@ export const getCardWithSquares = query({
 
     const squaresWithNames = await Promise.all(
       squares.map(async (s) => {
+        const baseActivity = s.baseActivityId
+          ? await ctx.db.get(s.baseActivityId)
+          : null;
         const activityName = s.baseActivityId
-          ? s.activityName ?? (await ctx.db.get(s.baseActivityId))?.name ?? null
+          ? s.activityName ?? baseActivity?.name ?? null
           : "FREE";
         const activityDescription = s.baseActivityId
           ? s.activityDescription ??
-            (await ctx.db.get(s.baseActivityId))?.description ??
-            null
+            baseActivity?.description ??
+            (baseActivity?.name
+              ? defaultActivityDescription(baseActivity.name)
+              : null)
           : s.activityDescription ?? "This center square is already free.";
         return {
           _id: s._id,

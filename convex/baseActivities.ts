@@ -10,7 +10,7 @@ const activityValidator = v.object({
   _creationTime: v.number(),
   organizationId: v.optional(v.id('organizations')),
   name: v.string(),
-  description: v.string(),
+  description: v.optional(v.string()),
   ageGroup: v.string(),
   activityType: v.union(v.literal('reading'), v.literal('activity')),
   raffleValue: v.number(),
@@ -20,6 +20,11 @@ const activityValidator = v.object({
 const CANNED_ACTIVITY_DESCRIPTIONS: Record<string, string> = {
   'Free Choice!':
     'Choose any reading activity that fits your age and interests, then complete it your own way.',
+}
+
+/** Matches seeded activity tips; use when persisting or displaying rows without `description`. */
+export function defaultActivityDescription(name: string): string {
+  return CANNED_ACTIVITY_DESCRIPTIONS[name] ?? `Helpful tip: ${name}.`
 }
 
 const ACTIVITIES_SEED = [
@@ -271,9 +276,7 @@ const ACTIVITIES_SEED = [
   },
 ].map((activity) => ({
   ...activity,
-  description:
-    CANNED_ACTIVITY_DESCRIPTIONS[activity.name] ??
-    `Helpful tip: ${activity.name}.`,
+  description: defaultActivityDescription(activity.name),
 }))
 
 type ActivityInput = {

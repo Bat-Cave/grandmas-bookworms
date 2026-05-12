@@ -66,7 +66,7 @@ export default defineSchema({
   baseActivities: defineTable({
     organizationId: v.optional(v.id('organizations')),
     name: v.string(),
-    description: v.string(),
+    description: v.optional(v.string()),
     ageGroup: v.string(),
     activityType: v.union(v.literal('reading'), v.literal('activity')),
     raffleValue: v.number(),

@@ -100,7 +100,7 @@ export function ActivityManager() {
     setActivityForm({
       activityId: activity._id,
       name: activity.name,
-      description: activity.description,
+      description: activity.description ?? '',
       ageGroup: activity.ageGroup,
       activityType: activity.activityType,
       raffleValue: activity.raffleValue.toString(),
