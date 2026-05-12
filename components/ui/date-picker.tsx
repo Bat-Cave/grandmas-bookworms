@@ -9,6 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { cn } from '@/lib/utils'
 
 type DatePickerSimpleProps = {
   label: string
@@ -17,10 +18,11 @@ type DatePickerSimpleProps = {
   value?: Date
   defaultValue?: Date
   onChange?: (date: Date | undefined) => void
+  className?: string
 }
 
 export function DatePickerSimple(props: DatePickerSimpleProps) {
-  const { label, id = 'date', value, defaultValue, onChange } = props
+  const { label, id = 'date', value, defaultValue, onChange, className } = props
   const isControlled = 'value' in props
   const [open, setOpen] = React.useState(false)
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(
@@ -35,7 +37,7 @@ export function DatePickerSimple(props: DatePickerSimpleProps) {
   }, [isControlled, value])
 
   return (
-    <Field className="mx-auto w-44">
+    <Field className={cn('mx-auto', className)}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
+import { DeleteConfirmation } from '@/components/delete-confirmation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -319,14 +320,30 @@ export function ActivityManager() {
                       >
                         Edit
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteActivity(activity._id)}
-                        disabled={activitySaving || activityDeletingId === activity._id}
+                      <DeleteConfirmation
+                        title="Delete this activity?"
+                        description="It will no longer appear on new bingo cards for your organization."
+                        onConfirm={() => handleDeleteActivity(activity._id)}
+                        disabled={
+                          activitySaving ||
+                          (activityDeletingId !== null &&
+                            activityDeletingId !== activity._id)
+                        }
+                        pendingLabel="Deleting…"
                       >
-                        {activityDeletingId === activity._id ? 'Deleting...' : 'Delete'}
-                      </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            activitySaving ||
+                            activityDeletingId === activity._id
+                          }
+                        >
+                          {activityDeletingId === activity._id
+                            ? 'Deleting...'
+                            : 'Delete'}
+                        </Button>
+                      </DeleteConfirmation>
                     </div>
                   </div>
                 </li>

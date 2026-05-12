@@ -1,74 +1,81 @@
-"use client";
+'use client'
 
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { useState } from "react";
-import type { Id } from "@/convex/_generated/dataModel";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { FamilyMemberAddForm } from "@/forms/family-member-add-form";
-import { FamilyMemberEditForm } from "@/forms/family-member-edit-form";
-import { toUserErrorMessage } from "@/lib/error-messages";
-import { getParticipantAgeGroup, getParticipantDisplayName } from "@/lib/participants";
-import { EmojiSequenceInput } from "@/components/family/emoji-sequence-input";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useMutation, useQuery } from 'convex/react'
+import { format } from 'date-fns'
+import { useState } from 'react'
+import { EmojiSequenceInput } from '@/components/family/emoji-sequence-input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { api } from '@/convex/_generated/api'
+import type { Id } from '@/convex/_generated/dataModel'
+import { FamilyMemberAddForm } from '@/forms/family-member-add-form'
+import { FamilyMemberEditForm } from '@/forms/family-member-edit-form'
+import { toUserErrorMessage } from '@/lib/error-messages'
+import {
+  getParticipantAgeGroup,
+  getParticipantDisplayName,
+} from '@/lib/participants'
 
 export default function FamilyPage() {
-  const account = useQuery(api.accounts.getMyAccount, {});
-  const participants = useQuery(api.participants.listMyParticipants, {});
-  const addMember = useMutation(api.participants.addMember);
-  const updateParticipant = useMutation(api.participants.updateParticipant);
-  const setParentPasscode = useMutation(api.accounts.setParentPasscode);
-  const setParticipantUnlock = useMutation(api.participants.setParticipantUnlock);
+  const account = useQuery(api.accounts.getMyAccount, {})
+  const participants = useQuery(api.participants.listMyParticipants, {})
+  const addMember = useMutation(api.participants.addMember)
+  const updateParticipant = useMutation(api.participants.updateParticipant)
+  const setParentPasscode = useMutation(api.accounts.setParentPasscode)
+  const setParticipantUnlock = useMutation(
+    api.participants.setParticipantUnlock,
+  )
 
-  const [adding, setAdding] = useState(false);
-  const [editingId, setEditingId] = useState<Id<"participants"> | null>(null);
-  const [passcode, setPasscode] = useState("");
-  const [passcodeConfirm, setPasscodeConfirm] = useState("");
-  const [passcodeError, setPasscodeError] = useState<string | null>(null);
-  const [savingPasscode, setSavingPasscode] = useState(false);
+  const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState<Id<'participants'> | null>(null)
+  const [passcode, setPasscode] = useState('')
+  const [passcodeConfirm, setPasscodeConfirm] = useState('')
+  const [passcodeError, setPasscodeError] = useState<string | null>(null)
+  const [savingPasscode, setSavingPasscode] = useState(false)
   const [unlockingParticipant, setUnlockingParticipant] = useState<{
-    _id: Id<"participants">;
-    firstName?: string;
-    lastName?: string;
-    role: "owner" | "member";
-    unlockType?: "pin" | "emoji";
-  } | null>(null);
-  const [unlockType, setUnlockType] = useState<"pin" | "emoji">("pin");
-  const [unlockValue, setUnlockValue] = useState("");
-  const [unlockPasscode, setUnlockPasscode] = useState("");
-  const [unlockError, setUnlockError] = useState<string | null>(null);
-  const [savingUnlock, setSavingUnlock] = useState(false);
+    _id: Id<'participants'>
+    firstName?: string
+    lastName?: string
+    role: 'owner' | 'member'
+    unlockType?: 'pin' | 'emoji'
+  } | null>(null)
+  const [unlockType, setUnlockType] = useState<'pin' | 'emoji'>('pin')
+  const [unlockValue, setUnlockValue] = useState('')
+  const [unlockPasscode, setUnlockPasscode] = useState('')
+  const [unlockError, setUnlockError] = useState<string | null>(null)
+  const [savingUnlock, setSavingUnlock] = useState(false)
 
   if (account === undefined || participants === undefined) {
-    return <p className="text-muted-foreground">Loading...</p>;
+    return <p className="text-muted-foreground">Loading...</p>
   }
-  if (account === null) return null;
-  if (account.type !== "family") {
+  if (account === null) return null
+  if (account.type !== 'family') {
     return (
       <div>
         <p className="text-muted-foreground">
-          Family management is only for family accounts. You have an individual account.
+          Family management is only for family accounts. You have an individual
+          account.
         </p>
       </div>
-    );
+    )
   }
 
   const handleAdd = async (values: {
-    firstName: string;
-    lastName: string;
-    birthday: string;
-    unlockType: "pin" | "emoji";
-    unlockValue: string;
+    firstName: string
+    lastName: string
+    birthday: string
+    unlockType: 'pin' | 'emoji'
+    unlockValue: string
   }) => {
-    setAdding(true);
+    setAdding(true)
     try {
       await addMember({
         accountId: account._id,
@@ -77,27 +84,31 @@ export default function FamilyPage() {
         birthday: values.birthday.trim(),
         unlockType: values.unlockType,
         unlockValue: values.unlockValue.trim(),
-      });
+      })
     } finally {
-      setAdding(false);
+      setAdding(false)
     }
-  };
+  }
 
-  const startEdit = (p: (typeof participants)[0]) => setEditingId(p._id);
+  const startEdit = (p: (typeof participants)[0]) => setEditingId(p._id)
 
-  const handleSaveEdit = async (values: { firstName: string; lastName: string; birthday: string }) => {
-    if (!editingId) return;
+  const handleSaveEdit = async (values: {
+    firstName: string
+    lastName: string
+    birthday: string
+  }) => {
+    if (!editingId) return
     await updateParticipant({
       participantId: editingId,
       firstName: values.firstName.trim(),
       lastName: values.lastName.trim(),
       birthday: values.birthday.trim(),
-    });
-    setEditingId(null);
-  };
+    })
+    setEditingId(null)
+  }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold">Family</h1>
 
       <Card>
@@ -135,32 +146,36 @@ export default function FamilyPage() {
           )}
           <Button
             onClick={async () => {
-              setPasscodeError(null);
+              setPasscodeError(null)
               if (!/^\d{4,6}$/.test(passcode)) {
-                setPasscodeError("Passcode must be 4-6 digits.");
-                return;
+                setPasscodeError('Passcode must be 4-6 digits.')
+                return
               }
               if (passcode !== passcodeConfirm) {
-                setPasscodeError("Passcodes do not match.");
-                return;
+                setPasscodeError('Passcodes do not match.')
+                return
               }
-              setSavingPasscode(true);
+              setSavingPasscode(true)
               try {
                 await setParentPasscode({
                   accountId: account._id,
                   parentPasscode: passcode,
-                });
-                setPasscode("");
-                setPasscodeConfirm("");
+                })
+                setPasscode('')
+                setPasscodeConfirm('')
               } catch (err) {
-                setPasscodeError(toUserErrorMessage(err, "Failed to save"));
+                setPasscodeError(toUserErrorMessage(err, 'Failed to save'))
               } finally {
-                setSavingPasscode(false);
+                setSavingPasscode(false)
               }
             }}
             disabled={savingPasscode}
           >
-            {savingPasscode ? "Saving…" : account.hasParentPasscode ? "Update passcode" : "Set passcode"}
+            {savingPasscode
+              ? 'Saving…'
+              : account.hasParentPasscode
+                ? 'Update passcode'
+                : 'Set passcode'}
           </Button>
         </CardContent>
       </Card>
@@ -181,13 +196,16 @@ export default function FamilyPage() {
         <CardContent>
           <ul className="space-y-4">
             {participants.map((p) => (
-              <li key={p._id} className="flex items-center justify-between border-b pb-4 last:border-0">
+              <li
+                key={p._id}
+                className="flex items-center justify-between border-b pb-4 last:border-0"
+              >
                 {editingId === p._id ? (
                   <FamilyMemberEditForm
                     defaultValues={{
-                      firstName: p.firstName ?? "",
-                      lastName: p.lastName ?? "",
-                      birthday: p.birthday ?? "",
+                      firstName: p.firstName ?? '',
+                      lastName: p.lastName ?? '',
+                      birthday: p.birthday ?? '',
                     }}
                     onCancel={() => setEditingId(null)}
                     onSubmit={handleSaveEdit}
@@ -200,15 +218,22 @@ export default function FamilyPage() {
                       </span>
                       <span className="text-muted-foreground ml-2">
                         {getParticipantAgeGroup(p)}
-                        {p.birthday && ` · ${p.birthday}`}
+                        {p.birthday &&
+                          ` · ${format(p.birthday, 'MMM d, yyyy')}`}
                       </span>
-                      {p.role === "owner" && (
-                        <span className="text-muted-foreground text-sm ml-2">(you)</span>
+                      {p.role === 'owner' && (
+                        <span className="text-muted-foreground text-sm ml-2">
+                          (you)
+                        </span>
                       )}
                     </div>
                     <div className="flex gap-2">
-                      {p.role !== "owner" && (
-                        <Button variant="outline" size="sm" onClick={() => startEdit(p)}>
+                      {p.role !== 'owner' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => startEdit(p)}
+                        >
                           Edit
                         </Button>
                       )}
@@ -216,11 +241,11 @@ export default function FamilyPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setUnlockingParticipant(p);
-                          setUnlockType(p.unlockType ?? "pin");
-                          setUnlockValue("");
-                          setUnlockPasscode("");
-                          setUnlockError(null);
+                          setUnlockingParticipant(p)
+                          setUnlockType(p.unlockType ?? 'pin')
+                          setUnlockValue('')
+                          setUnlockPasscode('')
+                          setUnlockError(null)
                         }}
                       >
                         Set quick unlock
@@ -245,7 +270,8 @@ export default function FamilyPage() {
           {unlockingParticipant && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Set a quick unlock for {getParticipantDisplayName(unlockingParticipant)}.
+                Set a quick unlock for{' '}
+                {getParticipantDisplayName(unlockingParticipant)}.
               </p>
               <div>
                 <Label>Unlock type</Label>
@@ -254,8 +280,8 @@ export default function FamilyPage() {
                     <input
                       type="radio"
                       value="pin"
-                      checked={unlockType === "pin"}
-                      onChange={() => setUnlockType("pin")}
+                      checked={unlockType === 'pin'}
+                      onChange={() => setUnlockType('pin')}
                       className="h-4 w-4"
                     />
                     <span>PIN</span>
@@ -264,15 +290,15 @@ export default function FamilyPage() {
                     <input
                       type="radio"
                       value="emoji"
-                      checked={unlockType === "emoji"}
-                      onChange={() => setUnlockType("emoji")}
+                      checked={unlockType === 'emoji'}
+                      onChange={() => setUnlockType('emoji')}
                       className="h-4 w-4"
                     />
                     <span>Emoji</span>
                   </label>
                 </div>
               </div>
-              {unlockType === "pin" ? (
+              {unlockType === 'pin' ? (
                 <div>
                   <Label>PIN</Label>
                   <Input
@@ -287,7 +313,10 @@ export default function FamilyPage() {
               ) : (
                 <div>
                   <Label>Emoji sequence</Label>
-                  <EmojiSequenceInput value={unlockValue} onChange={setUnlockValue} />
+                  <EmojiSequenceInput
+                    value={unlockValue}
+                    onChange={setUnlockValue}
+                  />
                 </div>
               )}
               <div>
@@ -307,36 +336,45 @@ export default function FamilyPage() {
               <div className="flex gap-2">
                 <Button
                   onClick={async () => {
-                    if (!unlockingParticipant) return;
-                    setUnlockError(null);
-                    if (unlockType === "pin" && !/^\d{4,6}$/.test(unlockValue)) {
-                      setUnlockError("PIN must be 4-6 digits.");
-                      return;
+                    if (!unlockingParticipant) return
+                    setUnlockError(null)
+                    if (
+                      unlockType === 'pin' &&
+                      !/^\d{4,6}$/.test(unlockValue)
+                    ) {
+                      setUnlockError('PIN must be 4-6 digits.')
+                      return
                     }
-                    if (unlockType === "emoji" && unlockValue.split("-").filter(Boolean).length < 3) {
-                      setUnlockError("Pick at least 3 emojis.");
-                      return;
+                    if (
+                      unlockType === 'emoji' &&
+                      unlockValue.split('-').filter(Boolean).length < 3
+                    ) {
+                      setUnlockError('Pick at least 3 emojis.')
+                      return
                     }
-                    setSavingUnlock(true);
+                    setSavingUnlock(true)
                     try {
                       await setParticipantUnlock({
                         participantId: unlockingParticipant._id,
                         parentPasscode: unlockPasscode,
                         unlockType,
                         unlockValue: unlockValue.trim(),
-                      });
-                      setUnlockingParticipant(null);
+                      })
+                      setUnlockingParticipant(null)
                     } catch (err) {
-                      setUnlockError(toUserErrorMessage(err, "Failed to save"));
+                      setUnlockError(toUserErrorMessage(err, 'Failed to save'))
                     } finally {
-                      setSavingUnlock(false);
+                      setSavingUnlock(false)
                     }
                   }}
                   disabled={savingUnlock}
                 >
-                  {savingUnlock ? "Saving…" : "Save"}
+                  {savingUnlock ? 'Saving…' : 'Save'}
                 </Button>
-                <Button variant="ghost" onClick={() => setUnlockingParticipant(null)}>
+                <Button
+                  variant="ghost"
+                  onClick={() => setUnlockingParticipant(null)}
+                >
                   Cancel
                 </Button>
               </div>
@@ -345,5 +383,5 @@ export default function FamilyPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

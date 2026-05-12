@@ -1,10 +1,10 @@
-import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
+import Link from 'next/link'
 import { ActivityManager } from '@/components/organization/activity-manager'
 
 export default function OrganizationActivitiesPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <div className="space-y-2">
         <Link
           href="/organization"

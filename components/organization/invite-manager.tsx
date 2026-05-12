@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
+import { DeleteConfirmation } from '@/components/delete-confirmation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -260,14 +261,30 @@ export function InviteManager() {
                           {copiedInviteId === invite._id ? 'Copied' : 'Copy code'}
                         </Button>
                         {!invite.isRevoked ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={revokingId === invite._id || creating}
-                            onClick={() => handleRevoke(invite._id)}
+                          <DeleteConfirmation
+                            title="Revoke this invite?"
+                            description="The code will stop working immediately and cannot be used again."
+                            label="Revoke"
+                            pendingLabel="Revoking…"
+                            onConfirm={() => handleRevoke(invite._id)}
+                            disabled={
+                              (revokingId !== null &&
+                                revokingId !== invite._id) ||
+                              creating
+                            }
                           >
-                            {revokingId === invite._id ? 'Revoking...' : 'Revoke'}
-                          </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={
+                                revokingId === invite._id || creating
+                              }
+                            >
+                              {revokingId === invite._id
+                                ? 'Revoking...'
+                                : 'Revoke'}
+                            </Button>
+                          </DeleteConfirmation>
                         ) : null}
                       </div>
                     </div>

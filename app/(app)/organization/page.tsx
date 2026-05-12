@@ -4,6 +4,7 @@ import { useMutation, useQuery } from 'convex/react'
 import { ArrowRight, KeyRound, Shapes } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
+import { DeleteConfirmation } from '@/components/delete-confirmation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/convex/_generated/api'
@@ -51,7 +52,7 @@ export default function OrganizationPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">Organization Admin</h1>
         <p className="text-muted-foreground">
@@ -70,7 +71,8 @@ export default function OrganizationPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Add, edit, or delete the activities that appear on future bingo cards.
+                Add, edit, or delete the activities that appear on future bingo
+                cards.
               </p>
               <p className="text-sm font-medium flex items-center gap-2">
                 Open activities
@@ -90,8 +92,8 @@ export default function OrganizationPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Create and revoke invite codes for families and members joining the
-                organization.
+                Create and revoke invite codes for families and members joining
+                the organization.
               </p>
               <p className="text-sm font-medium flex items-center gap-2">
                 Open invites
@@ -113,15 +115,21 @@ export default function OrganizationPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-md border p-3">
               <p className="text-xs text-muted-foreground">Accounts</p>
-              <p className="text-xl font-semibold">{roster?.totals.accounts ?? 0}</p>
+              <p className="text-xl font-semibold">
+                {roster?.totals.accounts ?? 0}
+              </p>
             </div>
             <div className="rounded-md border p-3">
               <p className="text-xs text-muted-foreground">Families</p>
-              <p className="text-xl font-semibold">{roster?.totals.families ?? 0}</p>
+              <p className="text-xl font-semibold">
+                {roster?.totals.families ?? 0}
+              </p>
             </div>
             <div className="rounded-md border p-3">
               <p className="text-xs text-muted-foreground">Individuals</p>
-              <p className="text-xl font-semibold">{roster?.totals.individuals ?? 0}</p>
+              <p className="text-xl font-semibold">
+                {roster?.totals.individuals ?? 0}
+              </p>
             </div>
             <div className="rounded-md border p-3">
               <p className="text-xs text-muted-foreground">Participants</p>
@@ -136,39 +144,62 @@ export default function OrganizationPage() {
               <h3 className="text-sm font-semibold">Families</h3>
               <ul className="space-y-2">
                 {(roster?.families ?? []).map((family) => (
-                  <li key={family.accountId} className="rounded-md border p-3 text-sm">
+                  <li
+                    key={family.accountId}
+                    className="rounded-md border p-3 text-sm"
+                  >
                     {(() => {
-                      const isCurrentUser = family.ownerId === membership.ownerId
+                      const isCurrentUser =
+                        family.ownerId === membership.ownerId
                       return (
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{family.displayName}</p>
-                        <p className="text-muted-foreground">
-                          {family.participantCount} participants
-                        </p>
-                        <p className="mt-1 text-muted-foreground">
-                          {family.members
-                            .map((member) =>
-                              member.role === 'owner'
-                                ? `${member.name} (owner${family.ownerId === membership.ownerId ? ', me' : ''})`
-                                : member.name,
-                            )
-                            .join(', ')}
-                        </p>
-                      </div>
-                      {isCurrentUser ? (
-                        <span className="text-xs text-muted-foreground">Current user</span>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRemoveMember(family.ownerId)}
-                          disabled={removingOwnerId === family.ownerId}
-                        >
-                          {removingOwnerId === family.ownerId ? 'Removing...' : 'Remove'}
-                        </Button>
-                      )}
-                    </div>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{family.displayName}</p>
+                            <p className="text-muted-foreground">
+                              {family.participantCount} participants
+                            </p>
+                            <p className="mt-1 text-muted-foreground">
+                              {family.members
+                                .map((member) =>
+                                  member.role === 'owner'
+                                    ? `${member.name} (owner${family.ownerId === membership.ownerId ? ', me' : ''})`
+                                    : member.name,
+                                )
+                                .join(', ')}
+                            </p>
+                          </div>
+                          {isCurrentUser ? (
+                            <span className="text-xs text-muted-foreground">
+                              Current user
+                            </span>
+                          ) : (
+                            <DeleteConfirmation
+                              title="Remove this member?"
+                              description="They will lose access to your organization and its activities."
+                              label="Remove"
+                              pendingLabel="Removing…"
+                              onConfirm={() =>
+                                handleRemoveMember(family.ownerId)
+                              }
+                              disabled={
+                                removingOwnerId !== null &&
+                                removingOwnerId !== family.ownerId
+                              }
+                            >
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={
+                                  removingOwnerId === family.ownerId
+                                }
+                              >
+                                {removingOwnerId === family.ownerId
+                                  ? 'Removing...'
+                                  : 'Remove'}
+                              </Button>
+                            </DeleteConfirmation>
+                          )}
+                        </div>
                       )
                     })()}
                   </li>
@@ -187,14 +218,20 @@ export default function OrganizationPage() {
                     className="rounded-md border p-3 text-sm"
                   >
                     {(() => {
-                      const isCurrentUser = individual.ownerId === membership.ownerId
+                      const isCurrentUser =
+                        individual.ownerId === membership.ownerId
                       return (
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="font-medium">{individual.displayName}</p>
+                            <p className="font-medium">
+                              {individual.displayName}
+                            </p>
                             <p className="text-muted-foreground">
-                              {(individual.members[0]?.name ?? 'Unknown')} (owner
-                              {individual.ownerId === membership.ownerId ? ', me' : ''})
+                              {individual.members[0]?.name ?? 'Unknown'} (owner
+                              {individual.ownerId === membership.ownerId
+                                ? ', me'
+                                : ''}
+                              )
                             </p>
                           </div>
                           {isCurrentUser ? (
@@ -202,16 +239,31 @@ export default function OrganizationPage() {
                               Current user
                             </span>
                           ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRemoveMember(individual.ownerId)}
-                              disabled={removingOwnerId === individual.ownerId}
+                            <DeleteConfirmation
+                              title="Remove this member?"
+                              description="They will lose access to your organization and its activities."
+                              label="Remove"
+                              pendingLabel="Removing…"
+                              onConfirm={() =>
+                                handleRemoveMember(individual.ownerId)
+                              }
+                              disabled={
+                                removingOwnerId !== null &&
+                                removingOwnerId !== individual.ownerId
+                              }
                             >
-                              {removingOwnerId === individual.ownerId
-                                ? 'Removing...'
-                                : 'Remove'}
-                            </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={
+                                  removingOwnerId === individual.ownerId
+                                }
+                              >
+                                {removingOwnerId === individual.ownerId
+                                  ? 'Removing...'
+                                  : 'Remove'}
+                              </Button>
+                            </DeleteConfirmation>
                           )}
                         </div>
                       )

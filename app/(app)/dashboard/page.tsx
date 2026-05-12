@@ -1,15 +1,12 @@
 'use client'
 
 import { useQuery } from 'convex/react'
+import { ArrowBigRight, Grid3X3, MessageCircle, Trophy } from 'lucide-react'
 import Link from 'next/link'
 import { useFamilySession } from '@/components/family/family-session'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/convex/_generated/api'
-import {
-  getParticipantAgeGroup,
-  getParticipantDisplayName,
-} from '@/lib/participants'
+import { getParticipantDisplayName } from '@/lib/participants'
 
 export default function DashboardPage() {
   const account = useQuery(api.accounts.getMyAccount, {})
@@ -19,16 +16,13 @@ export default function DashboardPage() {
     (p) => p._id === activeParticipantId,
   )
 
-  const isParent =
-    activeParticipant?.role === 'owner' && account?.type === 'family'
-
   if (account === undefined || participants === undefined) {
     return <p className="text-muted-foreground">Loading...</p>
   }
   if (account === null) return null
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold">
         Welcome,{' '}
         {activeParticipant
@@ -37,75 +31,47 @@ export default function DashboardPage() {
       </h1>
 
       <section className="grid gap-8 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>BINGO Card</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm mb-4">
-              Complete reading activities to get BINGO and earn raffle tickets
-              and badges.
-            </p>
-            <Button asChild>
-              <Link href="/card">View my card</Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Messages</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm mb-4">
-              Send and receive positive messages from the book club.
-            </p>
-            <Button asChild variant="outline">
-              <Link href="/messages">Go to messages</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <Link href="/card" className="group">
+          <Card className="bg-linear-to-br from-accent via-secondary to-accent animate-gradient bg-size-[400%_400%] text-foreground">
+            <CardHeader>
+              <CardTitle className="text-3xl">BINGO Card</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-foreground text-lg font-semibold">
+                Complete reading activities to get BINGO and earn raffle tickets
+                and badges.
+              </p>
+              <Grid3X3 className="size-10 ml-auto group-hover:translate-x-1 transition-transform" />
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/messages" className="group">
+          <Card className="bg-linear-to-br from-sky-500 via-secondary to-sky-500 animate-gradient bg-size-[400%_400%] text-forground">
+            <CardHeader>
+              <CardTitle className="text-3xl">Messages</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-foreground text-lg font-semibold">
+                Send and receive positive messages from the book club.
+              </p>
+              <MessageCircle className="size-10 ml-auto group-hover:translate-x-1 transition-transform" />
+            </CardContent>
+          </Card>
+        </Link>
       </section>
-
-      {participants.length > 0 && isParent && (
-        <Card>
+      <Link href="/rewards" className="group">
+        <Card className="bg-linear-to-br from-amber-500 via-orange-200 to-amber-500 animate-gradient bg-size-[400%_400%] text-forground">
           <CardHeader>
-            <CardTitle>Participants</CardTitle>
+            <CardTitle className="text-3xl">Rewards</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="list-disc list-inside space-y-1">
-              {participants.map((p) => (
-                <li key={p._id}>
-                  {getParticipantDisplayName(p)} ({getParticipantAgeGroup(p)})
-                  {account.type === 'family' && (
-                    <span className="text-muted-foreground ml-2">
-                      {p.role === 'owner' ? '— you' : ''}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {account.type === 'family' && (
-              <Button asChild variant="outline" className="mt-4">
-                <Link href="/family">Manage family</Link>
-              </Button>
-            )}
+            <p className="text-foreground text-lg font-semibold">
+              Raffle tickets and badges you&apos;ve earned.
+            </p>
+            <Trophy className="size-10 ml-auto group-hover:translate-x-1 transition-transform" />
           </CardContent>
         </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Rewards</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm mb-4">
-            Raffle tickets and badges you&apos;ve earned.
-          </p>
-          <Button asChild variant="outline">
-            <Link href="/rewards">View rewards</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      </Link>
     </div>
   )
 }

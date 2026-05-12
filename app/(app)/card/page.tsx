@@ -172,8 +172,9 @@ export default function CardPage() {
                   isCompleted ? 'bg-transparent text-gray-200' : '',
                   isCompleted &&
                     idx < 21 &&
-                    completionBySquare.get(cardWithSquares.squares[idx + 5]._id)
-                      ?.completedAt != null &&
+                    completionBySquare.get(
+                      cardWithSquares.squares[idx + 5]?._id,
+                    )?.completedAt != null &&
                     'border-b-0',
                   isCompleted &&
                     idx < 24 &&
@@ -195,12 +196,12 @@ export default function CardPage() {
                 <span className="font-medium line-clamp-3 text-pretty">
                   {sq.activityName}
                 </span>
-                {isCompleted && (
+                {/* {isCompleted && (
                   <span className="absolute top-1 left-1 gap-1 flex items-center justify-center text-xs">
                     <Check className="size-4" />
                     Done
                   </span>
-                )}
+                )} */}
                 {isStarted && !isCompleted && (
                   <span className="text-xs block mt-1 left-1/2 -translate-x-1/2 w-max absolute bottom-full mx-auto translate-y-1/2 bg-sky-600 rounded-sm text-sky-100 px-2 py-px">
                     <span className="animate-pulse">In progress</span>

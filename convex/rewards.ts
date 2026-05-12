@@ -199,6 +199,7 @@ export const getBingoLinesForParticipant = query({
   args: { participantId: v.id('participants') },
   returns: v.array(
     v.object({
+      bingoCardId: v.id('bingoCards'),
       lineType: v.union(
         v.literal('row'),
         v.literal('column'),
@@ -230,6 +231,7 @@ export const getBingoLinesForParticipant = query({
       )
       .collect()
     return lines.map((l) => ({
+      bingoCardId: l.bingoCardId,
       lineType: l.lineType,
       lineIndex: l.lineIndex,
       completedAt: l.completedAt,
