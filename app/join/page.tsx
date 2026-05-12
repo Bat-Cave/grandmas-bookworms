@@ -1,12 +1,6 @@
 'use client'
 
-import {
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  useAuth,
-} from '@clerk/nextjs'
+import { Show, SignInButton, SignUpButton, useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery } from 'convex/react'
 import { useRouter } from 'next/navigation'
 import { FormEvent, useEffect, useState } from 'react'
@@ -66,7 +60,9 @@ export default function JoinPage() {
     }
   }
 
-  const handleCreateOrganization = async (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateOrganization = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault()
     const name = organizationName.trim()
     if (!name) {
@@ -88,7 +84,7 @@ export default function JoinPage() {
 
   return (
     <>
-      <SignedOut>
+      <Show when="signed-out">
         <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
           <h1 className="text-2xl font-bold">Join Grandma&apos;s Bookworms</h1>
           <p className="max-w-md text-center text-muted-foreground">
@@ -104,9 +100,9 @@ export default function JoinPage() {
             </SignUpButton>
           </div>
         </div>
-      </SignedOut>
+      </Show>
 
-      <SignedIn>
+      <Show when="signed-in">
         {membership === undefined || account === undefined ? (
           <div className="flex min-h-screen items-center justify-center">
             <p className="text-muted-foreground">Loading...</p>
@@ -152,7 +148,9 @@ export default function JoinPage() {
                     <Input
                       id="organizationName"
                       value={organizationName}
-                      onChange={(event) => setOrganizationName(event.target.value)}
+                      onChange={(event) =>
+                        setOrganizationName(event.target.value)
+                      }
                       placeholder="The Friday Book Club"
                     />
                   </div>
@@ -167,7 +165,7 @@ export default function JoinPage() {
             </Card>
           </div>
         )}
-      </SignedIn>
+      </Show>
     </>
   )
 }

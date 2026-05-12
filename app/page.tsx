@@ -1,17 +1,11 @@
 'use client'
 
-import {
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  useAuth,
-} from '@clerk/nextjs'
+import { Show, SignInButton, SignUpButton, useAuth } from '@clerk/nextjs'
 import { useQuery } from 'convex/react'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
+import { api } from '@/convex/_generated/api'
 
 export default function Home() {
   const router = useRouter()
@@ -34,7 +28,7 @@ export default function Home() {
 
   return (
     <>
-      <SignedOut>
+      <Show when="signed-out">
         <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
           <h1 className="text-2xl font-bold">Grandma&apos;s Bookworms</h1>
           <p className="text-muted-foreground text-center max-w-sm">
@@ -49,12 +43,12 @@ export default function Home() {
             </SignUpButton>
           </div>
         </div>
-      </SignedOut>
-      <SignedIn>
+      </Show>
+      <Show when="signed-in">
         <div className="flex min-h-screen items-center justify-center">
           <p className="text-muted-foreground">Loading...</p>
         </div>
-      </SignedIn>
+      </Show>
     </>
   )
 }

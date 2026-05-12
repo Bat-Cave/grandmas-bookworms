@@ -1,8 +1,7 @@
 'use client'
 
 import {
-  SignedIn,
-  SignedOut,
+  Show,
   SignInButton,
   SignUpButton,
   UserButton,
@@ -50,7 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <SignedOut>
+      <Show when="signed-out">
         <div className="flex min-h-screen flex-col">
           <nav className="border-b px-4 py-3 flex flex-wrap gap-4 items-center justify-between">
             <Link href="/" className="font-medium hover:underline">
@@ -81,8 +80,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </main>
         </div>
-      </SignedOut>
-      <SignedIn>
+      </Show>
+      <Show when="signed-in">
         {membership === null || account === null ? null : (
           <FamilySessionProvider>
             <FamilyGate>
@@ -95,7 +94,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </FamilyGate>
           </FamilySessionProvider>
         )}
-      </SignedIn>
+      </Show>
     </>
   )
 }
@@ -206,17 +205,17 @@ function AppFrame({
             )}
             {(!isFamily || isParent) && (
               <>
-                <SignedOut>
+                <Show when="signed-out">
                   <SignInButton />
                   <SignUpButton>
                     <button className="bg-[#6c47ff] text-white rounded-full font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 cursor-pointer">
                       Sign Up
                     </button>
                   </SignUpButton>
-                </SignedOut>
-                <SignedIn>
+                </Show>
+                <Show when="signed-in">
                   <UserButton />
-                </SignedIn>
+                </Show>
               </>
             )}
           </div>
