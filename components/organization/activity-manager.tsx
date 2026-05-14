@@ -5,6 +5,14 @@ import { useMutation, useQuery } from 'convex/react'
 import { DeleteConfirmation } from '@/components/delete-confirmation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -17,6 +25,7 @@ type ActivityFormState = {
   activityId: Id<'baseActivities'> | null
   name: string
   description: string
+  timeRequired: string
   ageGroup: string
   activityType: 'reading' | 'activity'
   raffleValue: string
@@ -26,6 +35,7 @@ const EMPTY_ACTIVITY_FORM: ActivityFormState = {
   activityId: null,
   name: '',
   description: '',
+  timeRequired: '',
   ageGroup: 'All',
   activityType: 'reading',
   raffleValue: '1',
@@ -44,11 +54,13 @@ export function ActivityManager() {
 
   const [activityForm, setActivityForm] =
     useState<ActivityFormState>(EMPTY_ACTIVITY_FORM)
-  const [activityError, setActivityError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [listError, setListError] = useState<string | null>(null)
   const [activitySaving, setActivitySaving] = useState(false)
   const [activityDeletingId, setActivityDeletingId] =
     useState<Id<'baseActivities'> | null>(null)
   const [activityInitializing, setActivityInitializing] = useState(false)
+  const [formModalOpen, setFormModalOpen] = useState(false)
 
   const canManage = membership?.role === 'admin'
 
@@ -58,12 +70,12 @@ export function ActivityManager() {
 
     let cancelled = false
     setActivityInitializing(true)
-    setActivityError(null)
+    setListError(null)
 
     ensureDefaults()
       .catch((err) => {
         if (!cancelled) {
-          setActivityError(toUserErrorMessage(err, 'Failed to load base activities'))
+          setListError(toUserErrorMessage(err, 'Failed to load base activities'))
         }
       })
       .finally(() => {
@@ -91,36 +103,47 @@ export function ActivityManager() {
     )
   }
 
-  const resetActivityForm = () => {
+  const closeFormModal = () => {
     setActivityForm(EMPTY_ACTIVITY_FORM)
-    setActivityError(null)
+    setFormError(null)
+    setFormModalOpen(false)
   }
 
-  const handleEditActivity = (activity: NonNullable<typeof activities>[number]) => {
-    setActivityError(null)
+  const openAddModal = () => {
+    setActivityForm(EMPTY_ACTIVITY_FORM)
+    setFormError(null)
+    setFormModalOpen(true)
+  }
+
+  const openEditModal = (activity: NonNullable<typeof activities>[number]) => {
+    setFormError(null)
     setActivityForm({
       activityId: activity._id,
       name: activity.name,
       description: activity.description ?? '',
+      timeRequired: activity.timeRequired ?? '',
       ageGroup: activity.ageGroup,
       activityType: activity.activityType,
       raffleValue: activity.raffleValue.toString(),
     })
+    setFormModalOpen(true)
   }
 
   const handleSaveActivity = async () => {
-    setActivityError(null)
+    setFormError(null)
     setActivitySaving(true)
     try {
       const raffleValue = Number(activityForm.raffleValue.trim())
       if (!Number.isInteger(raffleValue) || raffleValue <= 0) {
-        setActivityError('Raffle value must be a positive whole number.')
+        setFormError('Raffle value must be a positive whole number.')
         return
       }
 
+      const timeTrimmed = activityForm.timeRequired.trim()
       const payload = {
         name: activityForm.name,
         description: activityForm.description,
+        ...(timeTrimmed.length > 0 ? { timeRequired: timeTrimmed } : {}),
         ageGroup: activityForm.ageGroup,
         activityType: activityForm.activityType,
         raffleValue,
@@ -135,145 +158,187 @@ export function ActivityManager() {
         await createActivity(payload)
       }
 
-      resetActivityForm()
+      closeFormModal()
     } catch (err) {
-      setActivityError(toUserErrorMessage(err, 'Failed to save activity'))
+      setFormError(toUserErrorMessage(err, 'Failed to save activity'))
     } finally {
       setActivitySaving(false)
     }
   }
 
   const handleDeleteActivity = async (activityId: Id<'baseActivities'>) => {
-    setActivityError(null)
+    setListError(null)
     setActivityDeletingId(activityId)
     try {
       await removeActivity({ activityId })
       if (activityForm.activityId === activityId) {
-        resetActivityForm()
+        closeFormModal()
       }
     } catch (err) {
-      setActivityError(toUserErrorMessage(err, 'Failed to delete activity'))
+      setListError(toUserErrorMessage(err, 'Failed to delete activity'))
     } finally {
       setActivityDeletingId(null)
     }
   }
 
+  const isEditing = activityForm.activityId !== null
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle>Base activities</CardTitle>
+        <Button type="button" onClick={openAddModal} disabled={activitySaving}>
+          Add activity
+        </Button>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-4 rounded-md border p-4">
-          <div className="space-y-2">
-            <Label htmlFor="activityName">Activity name</Label>
-            <Input
-              id="activityName"
-              value={activityForm.name}
-              onChange={(event) =>
-                setActivityForm((current) => ({
-                  ...current,
-                  name: event.target.value,
-                }))
-              }
-              placeholder="Read with grandma for 15 minutes"
-            />
-          </div>
+        {listError ? <p className="text-sm text-destructive">{listError}</p> : null}
 
-          <div className="space-y-2">
-            <Label htmlFor="activityDescription">Description</Label>
-            <Textarea
-              id="activityDescription"
-              value={activityForm.description}
-              onChange={(event) =>
-                setActivityForm((current) => ({
-                  ...current,
-                  description: event.target.value,
-                }))
-              }
-              placeholder="Helpful details participants should see before they start."
-            />
-          </div>
+        <Dialog
+          open={formModalOpen}
+          onOpenChange={(open) => {
+            if (!open && !activitySaving) {
+              closeFormModal()
+            }
+          }}
+        >
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{isEditing ? 'Edit activity' : 'Add activity'}</DialogTitle>
+              <DialogDescription>
+                {isEditing
+                  ? 'Update this activity. It will be used for new bingo cards and when resolving details for existing squares.'
+                  : "Create an activity for your organization's bingo pool."}
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="activityAgeGroup">Age groups</Label>
-              <Input
-                id="activityAgeGroup"
-                value={activityForm.ageGroup}
-                onChange={(event) =>
-                  setActivityForm((current) => ({
-                    ...current,
-                    ageGroup: event.target.value,
-                  }))
-                }
-                placeholder="All or 6 - 8,9 - 11"
-              />
-              <p className="text-xs text-muted-foreground">
-                Use `All` or a comma-separated list from {AGE_GROUP_LABELS.join(', ')}.
-              </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="activityName">Activity name</Label>
+                <Input
+                  id="activityName"
+                  value={activityForm.name}
+                  onChange={(event) =>
+                    setActivityForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                  placeholder="Read with grandma for 15 minutes"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="activityDescription">Description</Label>
+                <Textarea
+                  id="activityDescription"
+                  value={activityForm.description}
+                  onChange={(event) =>
+                    setActivityForm((current) => ({
+                      ...current,
+                      description: event.target.value,
+                    }))
+                  }
+                  placeholder="Helpful details participants should see before they start."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="activityTimeRequired">Time required (optional)</Label>
+                <Input
+                  id="activityTimeRequired"
+                  value={activityForm.timeRequired}
+                  onChange={(event) =>
+                    setActivityForm((current) => ({
+                      ...current,
+                      timeRequired: event.target.value,
+                    }))
+                  }
+                  placeholder="e.g. 15 minutes, 1 hour"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shown on the card so readers know roughly how long the activity takes.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="activityAgeGroup">Age groups</Label>
+                  <Input
+                    id="activityAgeGroup"
+                    value={activityForm.ageGroup}
+                    onChange={(event) =>
+                      setActivityForm((current) => ({
+                        ...current,
+                        ageGroup: event.target.value,
+                      }))
+                    }
+                    placeholder="All or 6 - 8,9 - 11"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Use `All` or a comma-separated list from {AGE_GROUP_LABELS.join(', ')}.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="activityType">Type</Label>
+                  <select
+                    id="activityType"
+                    className="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm"
+                    value={activityForm.activityType}
+                    onChange={(event) =>
+                      setActivityForm((current) => ({
+                        ...current,
+                        activityType: event.target.value as 'reading' | 'activity',
+                      }))
+                    }
+                  >
+                    <option value="reading">Reading</option>
+                    <option value="activity">Activity</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="activityRaffleValue">Raffle tickets</Label>
+                  <Input
+                    id="activityRaffleValue"
+                    inputMode="numeric"
+                    value={activityForm.raffleValue}
+                    onChange={(event) =>
+                      setActivityForm((current) => ({
+                        ...current,
+                        raffleValue: event.target.value,
+                      }))
+                    }
+                    placeholder="1"
+                  />
+                </div>
+              </div>
+
+              {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="activityType">Type</Label>
-              <select
-                id="activityType"
-                className="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm"
-                value={activityForm.activityType}
-                onChange={(event) =>
-                  setActivityForm((current) => ({
-                    ...current,
-                    activityType: event.target.value as 'reading' | 'activity',
-                  }))
-                }
-              >
-                <option value="reading">Reading</option>
-                <option value="activity">Activity</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="activityRaffleValue">Raffle tickets</Label>
-              <Input
-                id="activityRaffleValue"
-                inputMode="numeric"
-                value={activityForm.raffleValue}
-                onChange={(event) =>
-                  setActivityForm((current) => ({
-                    ...current,
-                    raffleValue: event.target.value,
-                  }))
-                }
-                placeholder="1"
-              />
-            </div>
-          </div>
-
-          {activityError ? (
-            <p className="text-sm text-destructive">{activityError}</p>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={handleSaveActivity} disabled={activitySaving}>
-              {activitySaving
-                ? activityForm.activityId
-                  ? 'Saving...'
-                  : 'Adding...'
-                : activityForm.activityId
-                  ? 'Save changes'
-                  : 'Add activity'}
-            </Button>
-            {activityForm.activityId ? (
+            <DialogFooter>
               <Button
+                type="button"
                 variant="outline"
-                onClick={resetActivityForm}
+                onClick={closeFormModal}
                 disabled={activitySaving}
               >
-                Cancel edit
+                Cancel
               </Button>
-            ) : null}
-          </div>
-        </div>
+              <Button type="button" onClick={handleSaveActivity} disabled={activitySaving}>
+                {activitySaving
+                  ? isEditing
+                    ? 'Saving...'
+                    : 'Adding...'
+                  : isEditing
+                    ? 'Save changes'
+                    : 'Add activity'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
@@ -310,12 +375,18 @@ export function ActivityManager() {
                       <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                         {activity.description || 'No description yet.'}
                       </p>
+                      {activity.timeRequired?.trim() ? (
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">Time:</span>{' '}
+                          {activity.timeRequired.trim()}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleEditActivity(activity)}
+                        onClick={() => openEditModal(activity)}
                         disabled={activitySaving || activityDeletingId !== null}
                       >
                         Edit

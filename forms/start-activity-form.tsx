@@ -11,12 +11,14 @@ import {
 
 type StartActivityFormProps = {
   activityDescription?: string | null
+  activityTimeRequired?: string | null
   loading?: boolean
   onSubmit: (values: StartActivityValues) => void | Promise<void>
 }
 
 export function StartActivityForm({
   activityDescription,
+  activityTimeRequired,
   loading,
   onSubmit,
 }: StartActivityFormProps) {
@@ -28,18 +30,24 @@ export function StartActivityForm({
   })
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <form
+      onSubmit={form.handleSubmit(onSubmit)}
+      className="space-y-4 h-full flex flex-col grow"
+    >
       {activityDescription ? (
         <div className="space-y-2">
-          <p className="text-sm font-medium">Before you start</p>
-          <Textarea
-            value={activityDescription}
-            readOnly
-            className="min-h-24 resize-none"
-          />
+          <p className="text-sm font-medium">{activityDescription}</p>
         </div>
       ) : null}
-      <Button type="submit" disabled={loading}>
+      {activityTimeRequired?.trim() ? (
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Time required</p>
+          <p className="text-sm text-muted-foreground">
+            {activityTimeRequired.trim()}
+          </p>
+        </div>
+      ) : null}
+      <Button type="submit" disabled={loading} className="mt-auto">
         {loading ? 'Starting…' : 'Start activity'}
       </Button>
     </form>

@@ -69,3 +69,60 @@ function hslToHex(h: number, s: number, l: number): string {
 
   return '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')
 }
+
+export function getHexHue(hex: string): number {
+  // 1. Clean the string and expand shorthand (e.g., "03f" -> "0033ff")
+  let cleaned = hex.replace(/^#/, '')
+  if (cleaned.length === 3) {
+    cleaned = cleaned
+      .split('')
+      .map((char) => char + char)
+      .join('')
+  }
+
+  // 2. Parse channels into integers (0-255)
+  const r = parseInt(cleaned.substring(0, 2), 16)
+  const g = parseInt(cleaned.substring(2, 4), 16)
+  const b = parseInt(cleaned.substring(4, 6), 16)
+
+  // 3. Normalize RGB values to fractions of 1
+  const rNorm = r / 255
+  const gNorm = g / 255
+  const bNorm = b / 255
+
+  const max = Math.max(rNorm, gNorm, bNorm)
+  const min = Math.min(rNorm, gNorm, bNorm)
+  const delta = max - min
+
+  let h = 0
+
+  // 4. Calculate hue based on which channel is dominant
+  if (delta === 0) {
+    h = 0 // Achromatic (gray, black, white)
+  } else {
+    switch (max) {
+      case rNorm:
+        h = (gNorm - bNorm) / delta + (gNorm < bNorm ? 6 : 0)
+        break
+      case gNorm:
+        h = (bNorm - rNorm) / delta + 2
+        break
+      case bNorm:
+        h = (rNorm - gNorm) / delta + 4
+        break
+    }
+    h = Math.round(h * 60) // Convert to degrees
+  }
+
+  return h
+}
+
+export function getHueDifference(h1: number, h2: number): number {
+  const diff = ((h2 - h1 + 180) % 360) - 180
+  return diff < -180 ? diff + 360 : diff
+}
+
+export function getAbsoluteHueDifference(h1: number, h2: number): number {
+  const diff = Math.abs(h1 - h2) % 360
+  return diff > 180 ? 360 - diff : diff
+}

@@ -67,6 +67,8 @@ export default defineSchema({
     organizationId: v.optional(v.id('organizations')),
     name: v.string(),
     description: v.optional(v.string()),
+    /** Free text, e.g. "15 minutes" — optional. */
+    timeRequired: v.optional(v.string()),
     ageGroup: v.string(),
     activityType: v.union(v.literal('reading'), v.literal('activity')),
     raffleValue: v.number(),
@@ -84,6 +86,10 @@ export default defineSchema({
     baseActivityId: v.optional(v.id('baseActivities')),
     activityName: v.optional(v.string()),
     activityDescription: v.optional(v.string()),
+    activityTimeRequired: v.optional(v.string()),
+    activityType: v.optional(
+      v.union(v.literal('reading'), v.literal('activity')),
+    ),
     raffleValue: v.optional(v.number()),
   }).index('by_card', ['bingoCardId']),
 

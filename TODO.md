@@ -1,0 +1,10 @@
+- [ ] A way to pick a raffle winner
+- [x] Add author to form
+- [ ] Amp up activites data
+- [ ] A way to see books you've read
+- [ ] Activity streaks
+- [ ] Once a month raffles
+- [ ] 1 bingo card a month
+- [ ] Choose activities for bingo
+- [x] Fireworks or confetti when activity completed
+- [x] Token or coin over completed spaces

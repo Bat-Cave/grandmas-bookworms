@@ -11,6 +11,7 @@ const activityValidator = v.object({
   organizationId: v.optional(v.id('organizations')),
   name: v.string(),
   description: v.optional(v.string()),
+  timeRequired: v.optional(v.string()),
   ageGroup: v.string(),
   activityType: v.union(v.literal('reading'), v.literal('activity')),
   raffleValue: v.number(),
@@ -282,6 +283,7 @@ const ACTIVITIES_SEED = [
 type ActivityInput = {
   name: string
   description: string
+  timeRequired?: string
   ageGroup: string
   activityType: 'reading' | 'activity'
   raffleValue: number
@@ -313,6 +315,10 @@ function normalizeActivityInput(input: ActivityInput) {
   const description = input.description.trim()
   if (description.length > 1000) throw new Error('INVALID_ACTIVITY_DESCRIPTION')
 
+  const timeRaw = (input.timeRequired ?? '').trim()
+  if (timeRaw.length > 120) throw new Error('INVALID_ACTIVITY_TIME_REQUIRED')
+  const timeRequired = timeRaw.length > 0 ? timeRaw : undefined
+
   if (!Number.isInteger(input.raffleValue) || input.raffleValue <= 0) {
     throw new Error('INVALID_ACTIVITY_RAFFLE_VALUE')
   }
@@ -320,6 +326,7 @@ function normalizeActivityInput(input: ActivityInput) {
   return {
     name,
     description,
+    timeRequired,
     ageGroup: normalizeAgeGroup(input.ageGroup),
     activityType: input.activityType,
     raffleValue: input.raffleValue,
@@ -399,6 +406,7 @@ export const create = mutation({
   args: {
     name: v.string(),
     description: v.string(),
+    timeRequired: v.optional(v.string()),
     ageGroup: v.string(),
     activityType: v.union(v.literal('reading'), v.literal('activity')),
     raffleValue: v.number(),
@@ -409,7 +417,14 @@ export const create = mutation({
     const activity = normalizeActivityInput(args)
     return await ctx.db.insert('baseActivities', {
       organizationId: membership.organizationId,
-      ...activity,
+      name: activity.name,
+      description: activity.description,
+      ...(activity.timeRequired !== undefined
+        ? { timeRequired: activity.timeRequired }
+        : {}),
+      ageGroup: activity.ageGroup,
+      activityType: activity.activityType,
+      raffleValue: activity.raffleValue,
     })
   },
 })
@@ -419,6 +434,7 @@ export const update = mutation({
     activityId: v.id('baseActivities'),
     name: v.string(),
     description: v.string(),
+    timeRequired: v.optional(v.string()),
     ageGroup: v.string(),
     activityType: v.union(v.literal('reading'), v.literal('activity')),
     raffleValue: v.number(),
@@ -432,7 +448,14 @@ export const update = mutation({
     }
 
     const activity = normalizeActivityInput(args)
-    await ctx.db.patch(args.activityId, activity)
+    await ctx.db.patch(args.activityId, {
+      name: activity.name,
+      description: activity.description,
+      timeRequired: activity.timeRequired,
+      ageGroup: activity.ageGroup,
+      activityType: activity.activityType,
+      raffleValue: activity.raffleValue,
+    })
     return null
   },
 })

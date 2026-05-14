@@ -238,8 +238,8 @@ export default function RewardsPage() {
                                 className={cn(
                                   'absolute h-[200%] w-2 bg-primary top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
                                   line.lineIndex === 0
-                                    ? 'rotate-45'
-                                    : '-rotate-45',
+                                    ? '-rotate-45'
+                                    : 'rotate-45',
                                 )}
                               />
                             )

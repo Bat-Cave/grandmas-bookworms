@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
+import { useMemo, useState } from 'react'
 import { DeleteConfirmation } from '@/components/delete-confirmation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { api } from '@/convex/_generated/api'
 import type { Id } from '@/convex/_generated/dataModel'
 import { toUserErrorMessage } from '@/lib/error-messages'
+import { cn } from '@/lib/utils'
 
 function formatDateTime(value: number) {
   return new Date(value).toLocaleString()
@@ -39,7 +40,9 @@ export function InviteManager() {
 
   const inviteStats = useMemo(() => {
     const all = invites ?? []
-    const active = all.filter((invite) => !invite.isRevoked && !invite.isExpired)
+    const active = all.filter(
+      (invite) => !invite.isRevoked && !invite.isExpired,
+    )
     return {
       total: all.length,
       active: active.length,
@@ -177,7 +180,9 @@ export function InviteManager() {
             <div className="rounded-md border bg-muted/30 p-3 space-y-2">
               <p className="text-sm font-medium">Share this invite code now</p>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-base font-semibold">{latestCode}</span>
+                <span className="font-mono text-base font-semibold">
+                  {latestCode}
+                </span>
                 <Button
                   variant="outline"
                   size="sm"
@@ -195,7 +200,10 @@ export function InviteManager() {
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-          <Button onClick={handleCreateInvite} disabled={creating || revokingId !== null}>
+          <Button
+            onClick={handleCreateInvite}
+            disabled={creating || revokingId !== null}
+          >
             {creating ? 'Creating...' : 'Create invite'}
           </Button>
         </CardContent>
@@ -215,82 +223,110 @@ export function InviteManager() {
             <p className="text-sm text-muted-foreground">No invites yet.</p>
           ) : (
             <ul className="space-y-3">
-              {(invites ?? []).map((invite) => {
-                const exhausted =
-                  invite.maxUses !== undefined && invite.useCount >= invite.maxUses
-                const status = invite.isRevoked
-                  ? 'Revoked'
-                  : invite.isExpired
-                    ? 'Expired'
-                    : exhausted
-                      ? 'Exhausted'
-                      : 'Active'
+              {(invites ?? [])
+                .sort((a, b) => {
+                  if (a.isRevoked && !b.isRevoked) return 1
+                  if (!a.isRevoked && b.isRevoked) return -1
+                  return 0
+                })
+                .map((invite) => {
+                  const exhausted =
+                    invite.maxUses !== undefined &&
+                    invite.useCount >= invite.maxUses
+                  const status = invite.isRevoked
+                    ? 'Revoked'
+                    : invite.isExpired
+                      ? 'Expired'
+                      : exhausted
+                        ? 'Exhausted'
+                        : 'Active'
 
-                return (
-                  <li key={invite._id} className="rounded-md border p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1 text-sm">
-                        <p>
-                          Code:{' '}
-                          <span className="font-mono">
-                            {invite.code ?? 'Unavailable'}
-                          </span>
-                        </p>
-                        <p>Status: {status}</p>
-                        <p>Created: {formatDateTime(invite.createdAt)}</p>
-                        <p>
-                          Uses: {invite.useCount}
-                          {invite.maxUses !== undefined
-                            ? ` / ${invite.maxUses}`
-                            : ' / unlimited'}
-                        </p>
-                        <p>
-                          Expires:{' '}
-                          {invite.expiresAt
-                            ? formatDateTime(invite.expiresAt)
-                            : 'never'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={!invite.code || creating}
-                          onClick={() => handleCopyInviteCode(invite._id, invite.code)}
-                        >
-                          {copiedInviteId === invite._id ? 'Copied' : 'Copy code'}
-                        </Button>
-                        {!invite.isRevoked ? (
-                          <DeleteConfirmation
-                            title="Revoke this invite?"
-                            description="The code will stop working immediately and cannot be used again."
-                            label="Revoke"
-                            pendingLabel="Revoking…"
-                            onConfirm={() => handleRevoke(invite._id)}
-                            disabled={
-                              (revokingId !== null &&
-                                revokingId !== invite._id) ||
-                              creating
+                  return (
+                    <li
+                      key={invite._id}
+                      className={cn(
+                        'rounded-md border p-3',
+                        status === 'Revoked'
+                          ? 'opacity-50 hover:opacity-100 transition-opacity'
+                          : '',
+                      )}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-1 text-sm">
+                          <p>
+                            Code:{' '}
+                            <span className="font-mono">
+                              {invite.code ?? 'Unavailable'}
+                            </span>
+                          </p>
+                          <p>
+                            Status:{' '}
+                            <span
+                              className={cn(
+                                status === 'Revoked'
+                                  ? 'text-destructive'
+                                  : 'text-green-500',
+                              )}
+                            >
+                              {status}
+                            </span>
+                          </p>
+                          <p>Created: {formatDateTime(invite.createdAt)}</p>
+                          <p>
+                            Uses: {invite.useCount}
+                            {invite.maxUses !== undefined
+                              ? ` / ${invite.maxUses}`
+                              : ' / unlimited'}
+                          </p>
+                          <p>
+                            Expires:{' '}
+                            {invite.expiresAt
+                              ? formatDateTime(invite.expiresAt)
+                              : 'never'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!invite.code || creating}
+                            onClick={() =>
+                              handleCopyInviteCode(invite._id, invite.code)
                             }
                           >
-                            <Button
-                              variant="outline"
-                              size="sm"
+                            {copiedInviteId === invite._id
+                              ? 'Copied'
+                              : 'Copy code'}
+                          </Button>
+                          {!invite.isRevoked ? (
+                            <DeleteConfirmation
+                              title="Revoke this invite?"
+                              description="The code will stop working immediately and cannot be used again."
+                              label="Revoke"
+                              pendingLabel="Revoking…"
+                              onConfirm={() => handleRevoke(invite._id)}
                               disabled={
-                                revokingId === invite._id || creating
+                                (revokingId !== null &&
+                                  revokingId !== invite._id) ||
+                                creating
                               }
                             >
-                              {revokingId === invite._id
-                                ? 'Revoking...'
-                                : 'Revoke'}
-                            </Button>
-                          </DeleteConfirmation>
-                        ) : null}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={revokingId === invite._id || creating}
+                              >
+                                {revokingId === invite._id
+                                  ? 'Revoking...'
+                                  : 'Revoke'}
+                              </Button>
+                            </DeleteConfirmation>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                )
-              })}
+                    </li>
+                  )
+                })}
             </ul>
           )}
         </CardContent>

@@ -175,7 +175,7 @@ export default function MessagesPage() {
             New message
           </Button>
         </CardHeader>
-        <CardContent className="flex-1 overflow-hidden p-0">
+        <CardContent className="flex-1 overflow-hidden p-0 flex flex-col">
           {isLoading ? (
             <p className="px-6 pb-4 text-sm text-muted-foreground">Loading…</p>
           ) : showNewMessage ? (
@@ -199,7 +199,7 @@ export default function MessagesPage() {
               No conversations yet. Send a message to get started.
             </p>
           ) : (
-            <div className="h-[240px] overflow-y-auto md:h-[320px]">
+            <div className="grow overflow-y-auto">
               <ul className="space-y-0">
                 {contacts.map((c) => (
                   <li key={c.participantId}>

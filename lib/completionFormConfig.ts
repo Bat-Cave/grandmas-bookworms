@@ -7,6 +7,8 @@ export interface FormFieldConfig {
   required: boolean;
   placeholder?: string;
   options?: { value: string; label: string }[];
+  /** Omit when completing a non-reading square (e.g. crafts, games). */
+  readingOnly?: boolean;
 }
 
 export interface AgeGroupFormConfig {
@@ -14,9 +16,34 @@ export interface AgeGroupFormConfig {
   fields: FormFieldConfig[];
 }
 
+const bookTitleField: FormFieldConfig = {
+  key: "bookTitle",
+  label: "Book or story title",
+  type: "text",
+  required: true,
+  placeholder: "e.g. The Cat in the Hat",
+  readingOnly: true,
+};
+
+const bookAuthorField: FormFieldConfig = {
+  key: "bookAuthor",
+  label: "Book author (optional)",
+  type: "text",
+  required: false,
+  placeholder: "e.g. Dr. Seuss — leave blank if you are not sure",
+  readingOnly: true,
+};
+
 const baseFields: FormFieldConfig[] = [
-  { key: "bookTitle", label: "Book or story title", type: "text", required: true, placeholder: "e.g. The Cat in the Hat" },
-  { key: "minutes", label: "Minutes spent", type: "number", required: false, placeholder: "10" },
+  bookTitleField,
+  bookAuthorField,
+  {
+    key: "minutes",
+    label: "Minutes spent",
+    type: "number",
+    required: false,
+    placeholder: "10",
+  },
 ];
 
 const completedWith: FormFieldConfig = {
@@ -53,9 +80,21 @@ export const completionFormConfigByAgeGroup: AgeGroupFormConfig[] = [
   { ageGroup: "Adult", fields: [...baseFields, summary] },
 ];
 
-export function getFormConfigForAgeGroup(ageGroup: string): FormFieldConfig[] {
+/** How the bingo square was categorized when the card was built (or from live base activity). */
+export type CompletionActivityKind = "reading" | "activity" | null;
+
+export function getFormConfigForAgeGroup(
+  ageGroup: string,
+  activityKind?: CompletionActivityKind,
+): FormFieldConfig[] {
   const config = completionFormConfigByAgeGroup.find(
     (c) => c.ageGroup === ageGroup
   );
-  return config?.fields ?? completionFormConfigByAgeGroup[0]!.fields;
+  const fields = config?.fields ?? completionFormConfigByAgeGroup[0]!.fields;
+
+  if (activityKind === "activity") {
+    return fields.filter((field) => !field.readingOnly);
+  }
+
+  return fields;
 }

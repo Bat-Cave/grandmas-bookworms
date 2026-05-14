@@ -28,6 +28,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   LAST_ADMIN_CANNOT_BE_REMOVED: 'This organization must keep at least one admin.',
   INVALID_ACTIVITY_NAME: 'Activity name is required.',
   INVALID_ACTIVITY_DESCRIPTION: 'Activity description is too long.',
+  INVALID_ACTIVITY_TIME_REQUIRED: 'Time required must be at most 120 characters.',
   INVALID_ACTIVITY_AGE_GROUP: 'Choose at least one valid age group.',
   INVALID_ACTIVITY_RAFFLE_VALUE: 'Raffle value must be a positive whole number.',
   SENDER_NOT_FOUND: 'Sender profile was not found.',

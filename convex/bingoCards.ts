@@ -84,6 +84,10 @@ export const getOrCreateForParticipant = mutation({
             ? "This center square is already free."
             : assigned!.description ??
               defaultActivityDescription(assigned!.name),
+        activityTimeRequired:
+          pos === FREE_POSITION ? undefined : assigned?.timeRequired,
+        activityType:
+          pos === FREE_POSITION ? undefined : assigned?.activityType,
         raffleValue:
           pos === FREE_POSITION ? 0 : picked[activityIndex - 1]?.raffleValue,
       });
@@ -148,6 +152,12 @@ export const getCardWithSquares = query({
           baseActivityId: v.optional(v.id("baseActivities")),
           activityDescription: v.union(v.string(), v.null()),
           activityName: v.union(v.string(), v.null()),
+          activityTimeRequired: v.union(v.string(), v.null()),
+          activityType: v.union(
+            v.literal("reading"),
+            v.literal("activity"),
+            v.null(),
+          ),
         })
       ),
     })
@@ -193,12 +203,20 @@ export const getCardWithSquares = query({
               ? defaultActivityDescription(baseActivity.name)
               : null)
           : s.activityDescription ?? "This center square is already free.";
+        const activityTimeRequired = s.baseActivityId
+          ? s.activityTimeRequired ?? baseActivity?.timeRequired ?? null
+          : null;
+        const activityType = s.baseActivityId
+          ? s.activityType ?? baseActivity?.activityType ?? "reading"
+          : null;
         return {
           _id: s._id,
           position: s.position,
           baseActivityId: s.baseActivityId,
           activityDescription,
           activityName,
+          activityTimeRequired,
+          activityType,
         };
       })
     );
